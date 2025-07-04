@@ -4,40 +4,47 @@ import { PrivyProvider as Privy } from '@privy-io/react-auth'
 import { WagmiProvider } from '@privy-io/wagmi'
 import { base } from 'viem/chains'
 import { http } from 'viem'
+import { createConfig } from 'wagmi'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+const wagmiConfig = createConfig({
+  chains: [base],
+  transports: {
+    [base.id]: http(process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://sepolia.base.org'),
+  },
+  ssr: true,
+})
+
+const queryClient = new QueryClient()
 
 export function PrivyProvider({ children }: { children: React.ReactNode }) {
   return (
-    <Privy
-      appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID!}
-      config={{
-        appearance: {
-          theme: 'light',
-          accentColor: '#0071e3',
-          logo: 'https://files.readme.io/a0c0c4f-privy-logo-black.svg',
-        },
-        embeddedWallets: {
-          createOnLogin: 'users-without-wallets',
-        },
-        defaultChain: base,
-        supportedChains: [base],
-        loginMethods: ['twitter', 'wallet', 'email'],
-        externalWallets: {
-          coinbaseWallet: {
-            connectionOptions: 'smartWalletOnly',
-          },
-        },
-      }}
-    >
-      <WagmiProvider
+    <QueryClientProvider client={queryClient}>
+      <Privy
+        appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID!}
         config={{
-          chains: [base],
-          transports: {
-            [base.id]: http(process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org'),
+          appearance: {
+            theme: 'light',
+            accentColor: '#0071e3',
+            logo: 'https://files.readme.io/a0c0c4f-privy-logo-black.svg',
+          },
+          embeddedWallets: {
+            createOnLogin: 'users-without-wallets',
+          },
+          defaultChain: base,
+          supportedChains: [base],
+          loginMethods: ['twitter', 'wallet', 'email'],
+          externalWallets: {
+            coinbaseWallet: {
+              connectionOptions: 'smartWalletOnly',
+            },
           },
         }}
       >
-        {children}
-      </WagmiProvider>
-    </Privy>
+        <WagmiProvider config={wagmiConfig}>
+          {children}
+        </WagmiProvider>
+      </Privy>
+    </QueryClientProvider>
   )
 }

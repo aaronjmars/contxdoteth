@@ -21,6 +21,7 @@ const config: Config = {
         success: '#34c759',
         warning: '#ff9500',
         error: '#ff3b30',
+        white: '#ffffff',
       },
       fontFamily: {
         sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"SF Pro Text"', '"Helvetica Neue"', 'Helvetica', 'Arial', 'sans-serif'],

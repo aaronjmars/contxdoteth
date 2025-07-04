@@ -1,11 +1,13 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { Brain, Menu, X, User, LogOut } from 'lucide-react'
+import { Hexagon, Menu, X, User, LogOut } from 'lucide-react'
 
 interface HeaderProps {
   isAuthenticated: boolean
-  user: any
+  user: {
+    wallet?: { address?: string }
+  } | null
   onLogin: () => void
   onLogout: () => void
   mobileMenuOpen: boolean
@@ -27,21 +29,19 @@ export default function Header({
   }
 
   return (
-    <header className="bg-white/80 backdrop-blur-lg border-b border-gray-200/50 sticky top-0 z-50">
+    <header className="bg-white/95 backdrop-blur-xl border-b border-border/50 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => router.push('/')}>
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-sm">
-              <Brain className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-lg font-semibold text-gray-900">Contx</span>
+          <div className="flex items-center space-x-2 cursor-pointer" onClick={() => router.push('/')}>
+            <Hexagon className="w-6 h-6 text-primary" />
+            <span className="text-xl font-semibold text-[#1d1d1f]">contx.eth</span>
           </div>
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
-            <a href="#features" className="text-gray-600 hover:text-gray-900 transition-colors">Features</a>
-            <a href="#how-it-works" className="text-gray-600 hover:text-gray-900 transition-colors">How it works</a>
+            <a href="#features" className="text-muted hover:text-[#1d1d1f] transition-colors text-sm">Features</a>
+            <a href="#how-it-works" className="text-muted hover:text-[#1d1d1f] transition-colors text-sm">How it works</a>
           </nav>
 
           {/* Auth Section */}
@@ -50,19 +50,19 @@ export default function Header({
               <div className="flex items-center space-x-3">
                 <button 
                   onClick={() => router.push('/dashboard')}
-                  className="flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  className="flex items-center space-x-2 px-4 py-2 rounded-full hover:bg-secondary transition-colors"
                 >
-                  <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                    <User className="w-3 h-3 text-white" />
+                  <div className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center">
+                    <User className="w-3 h-3 text-primary" />
                   </div>
-                  <span className="text-sm text-gray-700">
+                  <span className="text-sm text-[#1d1d1f] font-medium">
                     {user?.wallet?.address ? formatAddress(user.wallet.address) : 'User'}
                   </span>
                 </button>
                 <button 
                   onClick={onLogout}
-                  className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
-                  title="Logout"
+                  className="p-2 text-muted hover:text-[#1d1d1f] transition-colors rounded-full hover:bg-secondary"
+                  title="Sign out"
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
@@ -70,7 +70,7 @@ export default function Header({
             ) : (
               <button 
                 onClick={onLogin}
-                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors font-medium"
+                className="btn-primary text-sm"
               >
                 Connect Wallet
               </button>
@@ -79,7 +79,7 @@ export default function Header({
 
           {/* Mobile menu button */}
           <button 
-            className="md:hidden p-2"
+            className="md:hidden p-2 text-[#1d1d1f]"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle mobile menu"
           >
@@ -90,32 +90,37 @@ export default function Header({
 
       {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-white border-t border-gray-200">
+        <div className="md:hidden bg-white border-t border-border/50">
           <div className="px-4 py-4 space-y-3">
-            <a href="#features" className="block text-gray-600 hover:text-gray-900">Features</a>
-            <a href="#how-it-works" className="block text-gray-600 hover:text-gray-900">How it works</a>
+            <a href="#features" className="block text-muted hover:text-[#1d1d1f] py-2">Features</a>
+            <a href="#how-it-works" className="block text-muted hover:text-[#1d1d1f] py-2">How it works</a>
             {isAuthenticated ? (
-              <div className="space-y-2 pt-2 border-t border-gray-200">
+              <div className="space-y-2 pt-4 border-t border-border/50">
                 <button 
-                  onClick={() => router.push('/dashboard')}
-                  className="block w-full text-left px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                  onClick={() => {
+                    router.push('/dashboard')
+                    setMobileMenuOpen(false)
+                  }}
+                  className="block w-full text-left px-4 py-3 text-[#1d1d1f] hover:bg-secondary rounded-xl transition-colors"
                 >
                   Dashboard
                 </button>
                 <button 
                   onClick={onLogout}
-                  className="block w-full text-left px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                  className="block w-full text-left px-4 py-3 text-muted hover:bg-secondary rounded-xl transition-colors"
                 >
-                  Logout
+                  Sign out
                 </button>
               </div>
             ) : (
-              <button 
-                onClick={onLogin}
-                className="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors font-medium"
-              >
-                Connect Wallet
-              </button>
+              <div className="pt-4 border-t border-border/50">
+                <button 
+                  onClick={onLogin}
+                  className="w-full btn-primary"
+                >
+                  Connect Wallet
+                </button>
+              </div>
             )}
           </div>
         </div>

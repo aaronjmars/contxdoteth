@@ -1,7 +1,9 @@
 'use client'
 
 import { PrivyProvider as Privy } from '@privy-io/react-auth'
+import { WagmiProvider } from '@privy-io/wagmi'
 import { base } from 'viem/chains'
+import { http } from 'viem'
 
 export function PrivyProvider({ children }: { children: React.ReactNode }) {
   return (
@@ -10,17 +12,32 @@ export function PrivyProvider({ children }: { children: React.ReactNode }) {
       config={{
         appearance: {
           theme: 'light',
-          accentColor: '#3b82f6',
+          accentColor: '#0071e3',
+          logo: 'https://files.readme.io/a0c0c4f-privy-logo-black.svg',
         },
         embeddedWallets: {
           createOnLogin: 'users-without-wallets',
         },
         defaultChain: base,
         supportedChains: [base],
-        loginMethods: ['wallet', 'email', 'twitter'],
+        loginMethods: ['twitter', 'wallet', 'email'],
+        externalWallets: {
+          coinbaseWallet: {
+            connectionOptions: 'smartWalletOnly',
+          },
+        },
       }}
     >
-      {children}
+      <WagmiProvider
+        config={{
+          chains: [base],
+          transports: {
+            [base.id]: http(process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org'),
+          },
+        }}
+      >
+        {children}
+      </WagmiProvider>
     </Privy>
   )
 }

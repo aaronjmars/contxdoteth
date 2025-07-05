@@ -108,7 +108,7 @@ export default function DashboardNew() {
   const { data: walletClient } = useWalletClient()
   
   // Basename registration (existing)
-  const [_username, _setUsername] = useState('')
+  // const [_username, _setUsername] = useState('')
   const [registrationComplete, setRegistrationComplete] = useState(false)
   const [registeredName, setRegisteredName] = useState('')
   const [transactionHash, setTransactionHash] = useState('')
@@ -133,7 +133,7 @@ export default function DashboardNew() {
   const [ensTextKey, setEnsTextKey] = useState('bio')
   const [ensTextResult, setEnsTextResult] = useState<TestResult>({ status: 'pending', message: '' })
   
-  const { registerBasename: _registerBasename } = useENS()
+  // const { registerBasename: _registerBasename } = useENS()
 
   // Helper functions for test results
   const createLoadingResult = (message: string): TestResult => ({

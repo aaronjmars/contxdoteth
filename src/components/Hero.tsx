@@ -10,7 +10,7 @@ import { Plus } from "lucide-react";
 
 export function Hero() {
   const router = useRouter()
-  const { ready, authenticated, login, user } = usePrivy()
+  const { ready, authenticated, login } = usePrivy()
 
   useEffect(() => {
     renderCanvas();

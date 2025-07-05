@@ -9,8 +9,7 @@ import {
   LogOut, 
   AlertTriangle, 
   CheckCircle,
-  Copy,
-  ExternalLink 
+  Copy
 } from 'lucide-react'
 import { useState } from 'react'
 

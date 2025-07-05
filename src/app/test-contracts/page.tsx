@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useAccount, usePublicClient, useWalletClient } from 'wagmi'
-import { Address, parseEther, formatEther } from 'viem'
+import { Address } from 'viem'
 import { 
   CheckCircle, 
   XCircle, 
@@ -173,7 +173,7 @@ const CONTX_RESOLVER_ADDRESS = process.env.NEXT_PUBLIC_ETH_RESOLVER_ADDRESS as A
 interface TestResult {
   status: 'pending' | 'success' | 'error'
   message: string
-  data?: any
+  data?: unknown
 }
 
 interface Profile {
@@ -181,6 +181,7 @@ interface Profile {
   username: string
   exists: boolean
 }
+
 
 export default function TestContractsPage() {
   const { address, isConnected } = useAccount()
@@ -241,7 +242,7 @@ export default function TestContractsPage() {
   })
 
   // Helper function to create success state
-  const createSuccessResult = (message: string, data?: any): TestResult => ({
+  const createSuccessResult = (message: string, data?: unknown): TestResult => ({
     status: 'success',
     message,
     data
@@ -295,8 +296,9 @@ export default function TestContractsPage() {
       } else {
         setRegistrationResult(createErrorResult('Transaction failed'))
       }
-    } catch (error: any) {
-      setRegistrationResult(createErrorResult(error.message || 'Registration failed'))
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Registration failed'
+      setRegistrationResult(createErrorResult(errorMessage))
     }
   }
 
@@ -328,8 +330,9 @@ export default function TestContractsPage() {
         `Username ${checkUsername} is ${isAvailable ? 'available' : 'not available'}`,
         { isAvailable, exists }
       ))
-    } catch (error: any) {
-      setAvailabilityResult(createErrorResult(error.message || 'Availability check failed'))
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Availability check failed'
+      setAvailabilityResult(createErrorResult(errorMessage))
     }
   }
 
@@ -361,8 +364,9 @@ export default function TestContractsPage() {
         `Profile ${profileData.exists ? 'found' : 'not found'}`,
         profileData
       ))
-    } catch (error: any) {
-      setProfileResult(createErrorResult(error.message || 'Profile lookup failed'))
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Profile lookup failed'
+      setProfileResult(createErrorResult(errorMessage))
     }
   }
 
@@ -395,8 +399,9 @@ export default function TestContractsPage() {
       } else {
         setTextResult(createErrorResult('Transaction failed'))
       }
-    } catch (error: any) {
-      setTextResult(createErrorResult(error.message || 'Text update failed'))
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Text update failed'
+      setTextResult(createErrorResult(errorMessage))
     }
   }
 
@@ -437,8 +442,9 @@ export default function TestContractsPage() {
       } else {
         setBatchResult(createErrorResult('Transaction failed'))
       }
-    } catch (error: any) {
-      setBatchResult(createErrorResult(error.message || 'Batch update failed'))
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Batch update failed'
+      setBatchResult(createErrorResult(errorMessage))
     }
   }
 
@@ -478,8 +484,9 @@ export default function TestContractsPage() {
         `Retrieved ${fieldNames.length} fields for ${fieldsUsername}`,
         fieldsData
       ))
-    } catch (error: any) {
-      setFieldsResult(createErrorResult(error.message || 'Fields retrieval failed'))
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Fields retrieval failed'
+      setFieldsResult(createErrorResult(errorMessage))
     }
   }
 
@@ -519,8 +526,9 @@ export default function TestContractsPage() {
         `✅ ${resolveUsername}.contx.eth resolves to ${resolvedAddress} (Direct Registry)`,
         { address: resolvedAddress, owner: profile[0] }
       ))
-    } catch (error: any) {
-      setResolveResult(createErrorResult(error.message || 'Address resolution failed'))
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Address resolution failed'
+      setResolveResult(createErrorResult(errorMessage))
     }
   }
 
@@ -551,24 +559,26 @@ export default function TestContractsPage() {
           `✅ ENS resolution successful: ${ensUsername}.contx.eth → ${resolvedAddress}`,
           { address: resolvedAddress, node: node }
         ))
-      } catch (error: any) {
-        if (error.message.includes('OffchainLookup')) {
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        if (errorMessage.includes('OffchainLookup')) {
           setEnsResult(createSuccessResult(
             `🔄 CCIP-Read triggered! Gateway: https://contx.name/api/ccip-read/{sender}/{data}`,
             { 
               status: 'ccip-triggered',
               gateway: 'https://contx.name/api/ccip-read/{sender}/{data}',
-              error: error.message 
+              error: errorMessage 
             }
           ))
         } else {
           setEnsResult(createErrorResult(
-            `ENS resolution failed: ${error.message}. Check if CCIP-Read endpoint is implemented.`
+            `ENS resolution failed: ${errorMessage}. Check if CCIP-Read endpoint is implemented.`
           ))
         }
       }
-    } catch (error: any) {
-      setEnsResult(createErrorResult(error.message || 'ENS resolution test failed'))
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'ENS resolution test failed'
+      setEnsResult(createErrorResult(errorMessage))
     }
   }
 
@@ -601,8 +611,9 @@ export default function TestContractsPage() {
           `API test failed: ${data.error || 'Unknown error'}`
         ))
       }
-    } catch (error: any) {
-      setCcipResult(createErrorResult(error.message || 'CCIP-Read API test failed'))
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'CCIP-Read API test failed'
+      setCcipResult(createErrorResult(errorMessage))
     }
   }
 
@@ -646,13 +657,14 @@ export default function TestContractsPage() {
             resolver: CONTX_RESOLVER_ADDRESS
           }
         ))
-      } catch (error: any) {
-        if (error.message.includes('OffchainLookup') || error.message.includes('CCIP read')) {
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        if (errorMessage.includes('OffchainLookup') || errorMessage.includes('CCIP read')) {
           setEthEnsResult(createSuccessResult(
             `🔄 CCIP-Read triggered on Ethereum! This means your resolver is working correctly.`,
             { 
               status: 'ccip-triggered',
-              error: error.message,
+              error: errorMessage,
               network: 'Ethereum Mainnet',
               resolver: CONTX_RESOLVER_ADDRESS,
               note: 'The resolver is correctly throwing OffchainLookup to trigger CCIP-Read'
@@ -661,12 +673,13 @@ export default function TestContractsPage() {
         } else {
           console.error('Ethereum ENS error:', error)
           setEthEnsResult(createErrorResult(
-            `Ethereum ENS resolution failed: ${error.message}`
+            `Ethereum ENS resolution failed: ${errorMessage}`
           ))
         }
       }
-    } catch (error: any) {
-      setEthEnsResult(createErrorResult(error.message || 'Ethereum ENS test failed'))
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Ethereum ENS test failed'
+      setEthEnsResult(createErrorResult(errorMessage))
     }
   }
 
@@ -746,7 +759,7 @@ export default function TestContractsPage() {
             <div className="flex items-center gap-2">
               <AlertCircle className="w-5 h-5 text-blue-500" />
               <p className="text-sm text-blue-800">
-                <strong>Connect your wallet</strong> to test the contract functions. Click the "Connect Wallet" button above.
+                <strong>Connect your wallet</strong> to test the contract functions. Click the &quot;Connect Wallet&quot; button above.
               </p>
             </div>
           </div>
@@ -1030,7 +1043,7 @@ export default function TestContractsPage() {
               </button>
               <ResultDisplay result={ensResult} />
               <div className="text-xs text-gray-500">
-                <p>Gateway: https://contx.name/api/ccip-read/{'{sender}'}/{'{data}'}</p>
+                <p>Gateway: https://contx.name/api/ccip-read/{`{sender}`}/{`{data}`}</p>
               </div>
             </div>
           </div>
@@ -1122,7 +1135,7 @@ export default function TestContractsPage() {
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <h3 className="font-medium text-yellow-800 mb-2">⚠️ Remaining Issues</h3>
               <div className="text-sm text-yellow-700 space-y-2">
-                <p><strong>1. Hostname Mismatch</strong> - Resolver expects <code>contx.name</code> but you're testing on <code>localhost:3000</code></p>
+                <p><strong>1. Hostname Mismatch</strong> - Resolver expects <code>contx.name</code> but you&apos;re testing on <code>localhost:3000</code></p>
                 <p><strong>2. Domain Registration</strong> - contx.eth needs to be registered in ENS and point to your resolver</p>
                 <p><strong>3. Performance</strong> - Uncommon usernames may take longer to discover</p>
               </div>
@@ -1169,7 +1182,7 @@ export default function TestContractsPage() {
               Connected as: <span className="font-mono">{address}</span>
             </p>
             <p className="text-sm text-gray-700 mt-1">
-              CCIP-Read Gateway: <span className="font-mono text-xs">https://contx.name/api/ccip-read/{'{sender}'}/{'{data}'}</span>
+              CCIP-Read Gateway: <span className="font-mono text-xs">https://contx.name/api/ccip-read/{`{sender}`}/{`{data}`}</span>
             </p>
           </div>
         </div>

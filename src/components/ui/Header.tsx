@@ -29,7 +29,7 @@ export default function Header() {
           {/* Right: Claim Button */}
           <div className="flex-shrink-0">
             <InteractiveHoverButton 
-              text={authenticated ? 'Dashboard' : 'Mint'}
+              text={authenticated ? 'Dashboard' : 'Discover'}
               onClick={handleClaim}
               disabled={!ready}
               className="bg-primary text-primary-foreground border-primary text-sm px-6 py-2"

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { usePrivy } from '@privy-io/react-auth'
 import { renderCanvas } from "@/components/ui/canvas"
 import { InteractiveHoverButton } from "@/components/ui/interactive-hover-button";
+import { Tiles } from "@/components/ui/tiles";
 import { Plus } from "lucide-react";
 
 export function Hero() {
@@ -25,7 +26,7 @@ export function Hero() {
 
   return (
     <section id="home" className="relative overflow-hidden min-h-screen">
-      <div className="animation-delay-8 animate-fadeIn mt-20 flex flex-col items-center justify-center px-4 text-center md:mt-20">
+      <div className="animation-delay-8 animate-fadeIn mt-20 flex flex-col items-center justify-center px-4 text-center md:mt-20 relative z-10">
         <div className="mb-10 mt-4 md:mt-6">
           <div className="px-2">
             <div className="relative mx-auto h-full max-w-7xl border border-primary/20 p-6 [mask-image:radial-gradient(800rem_96rem_at_center,white,transparent)] md:px-12 md:py-20">
@@ -70,8 +71,18 @@ export function Hero() {
         </div>
       </div>
       
+      {/* Tiles Background */}
+      <div className="absolute inset-0 pointer-events-none opacity-15 z-0">
+        <Tiles 
+          rows={30} 
+          cols={20}
+          tileSize="md"
+          className="absolute inset-0"
+        />
+      </div>
+      
       <canvas
-        className="pointer-events-none absolute inset-0"
+        className="pointer-events-none absolute inset-0 z-5"
         id="canvas"
       ></canvas>
     </section>

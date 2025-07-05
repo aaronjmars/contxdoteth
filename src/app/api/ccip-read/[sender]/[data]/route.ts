@@ -233,6 +233,14 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ sender: string; data: string }> }
 ) {
+  // Add CORS headers to all responses
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Max-Age': '86400',
+  }
+
   try {
     const { sender, data } = await params
     
@@ -343,16 +351,12 @@ export async function GET(
       console.log('❌ Unsupported function selector:', selector)
       return NextResponse.json({ 
         error: `Function not supported: ${selector}` 
-      }, { status: 404 })
+      }, { status: 404, headers: corsHeaders })
     }
 
     console.log('✅ CCIP-Read completed successfully!')
     return NextResponse.json({ data: result }, {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-      }
+      headers: corsHeaders
     })
 
   } catch (error) {
@@ -363,11 +367,7 @@ export async function GET(
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { 
       status: 500,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-      }
+      headers: corsHeaders
     })
   }
 }
@@ -464,7 +464,8 @@ export async function OPTIONS() {
     headers: {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Max-Age': '86400',
     },
   })
 }

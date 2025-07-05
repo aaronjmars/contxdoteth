@@ -1,7 +1,7 @@
 // src/app/api/test-gateway/route.ts - Updated for Production
 import { NextRequest, NextResponse } from 'next/server'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   const baseUrl = process.env.NODE_ENV === 'production' 
     ? 'https://contx.name'
     : 'http://localhost:3000'

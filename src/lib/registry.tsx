@@ -22,15 +22,12 @@ export default function StyledComponentsRegistry({
   if (typeof window !== 'undefined') {
     return (
       <StyleSheetManager
-        shouldForwardProp={(prop, defaultValidatorFn) => {
+        shouldForwardProp={(prop) => {
           // Filter out problematic props that shouldn't reach DOM
           if (prop === 'isActive' || prop === 'isactive' || prop === 'active') {
             return false
           }
           // Use emotion's isPropValid for standard validation
-          if (typeof defaultValidatorFn === 'function') {
-            return defaultValidatorFn(prop)
-          }
           return isPropValid(prop)
         }}
       >
@@ -42,15 +39,12 @@ export default function StyledComponentsRegistry({
   return (
     <StyleSheetManager
       sheet={styledComponentsStyleSheet.instance}
-      shouldForwardProp={(prop, defaultValidatorFn) => {
+      shouldForwardProp={(prop) => {
         // Filter out problematic props that shouldn't reach DOM
         if (prop === 'isActive' || prop === 'isactive' || prop === 'active') {
           return false
         }
         // Use emotion's isPropValid for standard validation
-        if (typeof defaultValidatorFn === 'function') {
-          return defaultValidatorFn(prop)
-        }
         return isPropValid(prop)
       }}
     >

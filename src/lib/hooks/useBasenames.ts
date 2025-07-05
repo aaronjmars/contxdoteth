@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react'
-import { usePublicClient } from 'wagmi'
+import { useState, useEffect, useCallback } from 'react'
 import { createPublicClient, http, Address, keccak256, encodePacked } from 'viem'
 import { baseSepolia } from 'viem/chains'
 
@@ -57,13 +56,8 @@ export function useBasenames(address: Address | undefined) {
   const [reverseRecord, setReverseRecord] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
-  useEffect(() => {
-    if (address) {
-      checkReverseRecord(address)
-    }
-  }, [address])
 
-  const checkReverseRecord = async (userAddress: Address) => {
+  const checkReverseRecord = useCallback(async (userAddress: Address) => {
     setIsLoading(true)
     
     try {
@@ -82,7 +76,7 @@ export function useBasenames(address: Address | undefined) {
           setReverseRecord(reverseName)
           setBasenames([reverseName])
         }
-      } catch (error) {
+      } catch {
         console.log('No reverse record found')
       }
 
@@ -102,7 +96,7 @@ export function useBasenames(address: Address | undefined) {
             setBasenames(prev => [...prev, standardReverseName])
           }
         }
-      } catch (error) {
+      } catch {
         console.log('No standard reverse record found')
       }
     } catch (error) {
@@ -110,7 +104,13 @@ export function useBasenames(address: Address | undefined) {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [basenames])
+
+  useEffect(() => {
+    if (address) {
+      checkReverseRecord(address)
+    }
+  }, [address, checkReverseRecord])
 
   return {
     basenames,

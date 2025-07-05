@@ -21,7 +21,6 @@ import {
   Copy,
   ExternalLink,
   Droplets,
-  Settings,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 

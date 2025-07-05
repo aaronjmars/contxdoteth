@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useENS } from '@/lib/hooks/useENS'
 import { formatEther } from 'viem'
 import {
@@ -42,13 +42,13 @@ export default function BasenameRegistration({ aiContext, onSuccess }: BasenameR
     setDesiredName(formatted)
   }
 
-  const handleCheckAvailability = async () => {
+  const handleCheckAvailability = useCallback(async () => {
     if (!desiredName || !isValidBasename(desiredName)) return
     setCheckingAvailability(true)
     await checkAvailability(desiredName)
     await getRegistrationPrice(desiredName)
     setCheckingAvailability(false)
-  }
+  }, [desiredName, isValidBasename, checkAvailability, getRegistrationPrice])
 
   const handleRegister = async () => {
     if (!desiredName || !aiContext || !registrationStatus.isAvailable) return

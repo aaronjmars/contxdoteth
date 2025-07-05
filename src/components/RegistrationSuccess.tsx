@@ -10,9 +10,7 @@ import {
   Brain,
   Hexagon,
   ArrowRight,
-  AlertTriangle,
 } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 import RegistrationVerification from './RegistrationVerification'
 
 interface RegistrationSuccessProps {
@@ -31,7 +29,6 @@ export default function RegistrationSuccess({
   transactionHash, 
   aiContext 
 }: RegistrationSuccessProps) {
-  const router = useRouter()
   const [copied, setCopied] = useState<string | null>(null)
 
   const copyToClipboard = async (text: string, type: string) => {

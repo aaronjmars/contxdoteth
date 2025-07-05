@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useAccount, usePublicClient } from 'wagmi'
+import { useState, useEffect, useCallback } from 'react'
+import { useAccount } from 'wagmi'
 import { normalize } from 'viem/ens'
 import { baseSepolia } from 'viem/chains'
-import { createPublicClient, http, Address, namehash, keccak256, encodePacked } from 'viem'
+import { createPublicClient, http, Address, namehash, keccak256 } from 'viem'
 import { CheckCircle, XCircle, Loader2, AlertTriangle } from 'lucide-react'
 
 const publicClient = createPublicClient({
@@ -62,37 +62,7 @@ const RESOLVER_ABI = [
   },
 ] as const
 
-function namehashHelper(name: string): `0x${string}` {
-  if (name === '') {
-    return '0x0000000000000000000000000000000000000000000000000000000000000000'
-  }
-  
-  const labels = name.split('.')
-  let hash = '0x0000000000000000000000000000000000000000000000000000000000000000'
-  
-  for (let i = labels.length - 1; i >= 0; i--) {
-    const label = labels[i]
-    const labelHash = keccak256(new TextEncoder().encode(label))
-    hash = keccak256(encodePacked(['bytes32', 'bytes32'], [hash as `0x${string}`, labelHash]))
-  }
-  
-  return hash as `0x${string}`
-}
 
-function convertReverseNodeToBytes(address: Address, chainId: number) {
-  const addressFormatted = address.toLowerCase() as Address
-  const addressNode = keccak256(addressFormatted.substring(2) as Address)
-  
-  const cointype = (0x80000000 | chainId) >>> 0
-  const chainCoinType = cointype.toString(16).toUpperCase()
-  
-  const baseReverseNode = namehashHelper(`${chainCoinType}.reverse`)
-  const addressReverseNode = keccak256(
-    encodePacked(['bytes32', 'bytes32'], [baseReverseNode, addressNode])
-  )
-  
-  return addressReverseNode
-}
 
 interface RegistrationVerificationProps {
   baseName: string
@@ -101,15 +71,18 @@ interface RegistrationVerificationProps {
 export default function RegistrationVerification({ baseName }: RegistrationVerificationProps) {
   const { address } = useAccount()
   const [isLoading, setIsLoading] = useState(true)
-  const [results, setResults] = useState<any>(null)
+  const [results, setResults] = useState<{
+    nftOwned?: boolean
+    registryOwned?: boolean
+    hasResolver?: boolean
+    forwardWorks?: boolean
+    reverseWorks?: boolean
+    details?: unknown
+    error?: string
+  } | null>(null)
 
-  useEffect(() => {
-    if (baseName && address) {
-      verifyRegistration()
-    }
-  }, [baseName, address])
 
-  const verifyRegistration = async () => {
+  const verifyRegistration = useCallback(async () => {
     if (!address) return
 
     setIsLoading(true)
@@ -202,7 +175,13 @@ export default function RegistrationVerification({ baseName }: RegistrationVerif
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [address, baseName])
+
+  useEffect(() => {
+    if (baseName && address) {
+      verifyRegistration()
+    }
+  }, [baseName, address, verifyRegistration])
 
   if (isLoading) {
     return (

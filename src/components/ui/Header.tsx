@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { Menu, X, User, LogOut } from 'lucide-react'
 import { useENSName } from '@/lib/hooks/useENSName'
+import Image from 'next/image'
 
 interface HeaderProps {
   isAuthenticated: boolean
@@ -34,9 +35,11 @@ export default function Header({
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <div className="flex items-center space-x-2 cursor-pointer" onClick={() => router.push('/')}>
-            <img 
+            <Image 
               src="/contxdoteth.png" 
               alt="contx.eth logo" 
+              width={24}
+              height={24}
               className="w-6 h-6"
             />
             <span className="text-xl font-semibold text-[#1d1d1f]">contx.eth</span>

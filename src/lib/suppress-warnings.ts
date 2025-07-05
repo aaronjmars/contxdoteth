@@ -3,7 +3,7 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   const originalConsoleError = console.error
   const originalConsoleWarn = console.warn
 
-  console.error = (...args: any[]) => {
+  console.error = (...args: unknown[]) => {
     const message = String(args[0] || '')
     
     // Suppress ALL styled-components and React prop warnings
@@ -22,7 +22,7 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
     originalConsoleError.apply(console, args)
   }
 
-  console.warn = (...args: any[]) => {
+  console.warn = (...args: unknown[]) => {
     const message = String(args[0] || '')
     
     // Suppress ALL warnings related to:
@@ -43,7 +43,7 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
 
   // Also suppress console.log for styled-components
   const originalConsoleLog = console.log
-  console.log = (...args: any[]) => {
+  console.log = (...args: unknown[]) => {
     const message = String(args[0] || '')
     
     if (

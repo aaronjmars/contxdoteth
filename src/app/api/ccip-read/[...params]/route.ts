@@ -99,7 +99,7 @@ async function extractUsernameFromNode(node: string): Promise<string> {
         if (profile[2]) { // exists = true
           return username
         }
-      } catch (error) {
+      } catch {
         console.log('❌ Username not registered:', username)
       }
     }
@@ -112,12 +112,13 @@ async function extractUsernameFromNode(node: string): Promise<string> {
 // Main CCIP-Read handler
 export async function GET(
   request: NextRequest,
-  { params }: { params: { params: string[] } }
+  { params }: { params: Promise<{ params: string[] }> }
 ) {
   try {
     console.log('🌉 Production CCIP-Read Gateway Request')
     
-    const [sender, data] = params.params || []
+    const resolvedParams = await params
+    const [sender, data] = resolvedParams.params || []
     
     if (!sender || !data) {
       return NextResponse.json(
@@ -137,7 +138,7 @@ export async function GET(
     let decodedBytes: Buffer
     try {
       decodedBytes = Buffer.from(data.slice(2), 'hex')
-    } catch (error) {
+    } catch {
       return NextResponse.json(
         { error: 'Invalid hex data' },
         { status: 400 }
@@ -256,7 +257,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Username required' }, { status: 400 })
     }
 
-    let result: any
+    let result: unknown
 
     switch (method) {
       case 'getProfile':

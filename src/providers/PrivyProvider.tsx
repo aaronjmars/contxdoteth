@@ -18,10 +18,18 @@ const wagmiConfig = createConfig({
 const queryClient = new QueryClient()
 
 export function PrivyProvider({ children }: { children: React.ReactNode }) {
+  // Use a placeholder app ID during build time
+  const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID || 'placeholder-for-build'
+  
+  // Skip rendering during build if no real app ID
+  if (typeof window === 'undefined' && appId === 'placeholder-for-build') {
+    return <>{children}</>
+  }
+  
   return (
     <QueryClientProvider client={queryClient}>
       <Privy
-        appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID!}
+        appId={appId}
         config={{
           appearance: {
             theme: 'light',

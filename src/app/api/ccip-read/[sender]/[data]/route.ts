@@ -316,18 +316,31 @@ export async function GET(
         }, { status: 400, headers: corsHeaders })
       }
       
-      // Decode the key parameter (string)
+      // Decode the full text function parameters: (node, key)
+      // The data after the selector contains both node and key
       const parametersHex = ('0x' + parametersData.toString('hex')) as `0x${string}`
       console.log('📝 Parameters hex:', parametersHex)
       
       const decoded = decodeAbiParameters(
-        [{ name: 'key', type: 'string' }],
+        [
+          { name: 'node', type: 'bytes32' },
+          { name: 'key', type: 'string' }
+        ],
         parametersHex
       )
       
-      const key = decoded[0] as string
+      const decodedNode = decoded[0] as string
+      const key = decoded[1] as string
       
-      console.log('🔑 Decoded key:', key)
+      console.log('🔗 Decoded node from params:', decodedNode)
+      console.log('🔑 Decoded key:', `"${key}"`)
+      
+      // Verify the nodes match
+      if (decodedNode.toLowerCase() !== node.toLowerCase()) {
+        console.log('⚠️ Warning: Node mismatch between header and parameters')
+        console.log('  Header node:', node)
+        console.log('  Params node:', decodedNode)
+      }
       
       try {
         const username = await findUsernameFromNode(node)

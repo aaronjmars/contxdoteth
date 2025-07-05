@@ -58,12 +58,12 @@ function generateAIContext(profile: TwitterProfile, tweets: Tweet[]) {
   const bioLines = createBioLines(profile, tweets)
 
   return {
-    'ai.bio': bioLines,
-    'ai.style': style,
-    'ai.topics': topics,
-    'ai.traits': traits,
-    'ai.updated': new Date().toISOString(),
-    'ai.version': '1.0'
+    bio: bioLines,
+    style: style,
+    topics: topics,
+    traits: traits,
+    updated: new Date().toISOString(),
+    version: '1.0'
   }
 }
 
@@ -87,6 +87,11 @@ function extractTopics(tweets: Tweet[]): string[] {
     if (keywords.some(keyword => tweetText.includes(keyword))) {
       foundTopics.push(topic)
     }
+  }
+
+  // Default topics if none found
+  if (foundTopics.length === 0) {
+    foundTopics.push('technology', 'community')
   }
 
   return foundTopics.slice(0, 6) // Limit to 6 topics
@@ -123,6 +128,11 @@ function analyzeStyle(tweets: Tweet[]): { [key: string]: string[] } {
   )
   if (hasTechnicalTerms) {
     styles.push('technical')
+  }
+
+  // Ensure we always have some styles
+  if (styles.length === 0) {
+    styles.push('thoughtful', 'professional')
   }
 
   return {

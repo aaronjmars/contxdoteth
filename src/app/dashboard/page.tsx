@@ -2,21 +2,28 @@
 
 import { useState } from 'react'
 import { usePrivy } from '@privy-io/react-auth'
-import BasenameRegistration from '@/components/BasenameRegistration'
+import ENSMintOrUpdate from '@/components/ENSMintOrUpdate'
 import RegistrationSuccess from '@/components/RegistrationSuccess'
+import BasenamesList from '@/components/BasenamesList'
+import { useENSName } from '@/lib/hooks/useENSName'
 import {
   Twitter,
   User,
   RefreshCw,
   CheckCircle,
   AlertCircle,
-  Hexagon,
   Sparkles,
   Brain,
   Edit3,
   Download,
   Share2,
+  ArrowLeft,
+  Copy,
+  ExternalLink,
+  Droplets,
+  Settings,
 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
 interface AIContext {
   bio: string[]
@@ -26,6 +33,7 @@ interface AIContext {
 }
 
 export default function Dashboard() {
+  const router = useRouter()
   const { user, linkTwitter, unlinkTwitter } = usePrivy()
   // Removed unused state variables
   const [aiContext, setAiContext] = useState<AIContext | null>(null)
@@ -33,6 +41,8 @@ export default function Dashboard() {
   const [transactionHash, setTransactionHash] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [registrationStep, setRegistrationStep] = useState<'pending' | 'registering' | 'completed'>('pending')
+  const [copiedAddress, setCopiedAddress] = useState(false)
+  const { getDisplayName } = useENSName(user?.wallet?.address as `0x${string}`)
 
   const twitterAccount = user?.twitter
   const hasTwitter = !!twitterAccount
@@ -107,15 +117,30 @@ export default function Dashboard() {
     navigator.clipboard.writeText(text)
   }
 
-  const formatAddress = (address: string) => {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`
+  const copyWalletAddress = () => {
+    if (user?.wallet?.address) {
+      navigator.clipboard.writeText(user.wallet.address)
+      setCopiedAddress(true)
+      setTimeout(() => setCopiedAddress(false), 2000)
+    }
   }
+
+  const displayName = getDisplayName(user?.wallet?.address)
 
   return (
     <div className="flex-1 bg-white min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
+          <div className="flex items-center gap-4 mb-4">
+            <button
+              onClick={() => router.push('/')}
+              className="flex items-center gap-2 text-muted hover:text-[#1d1d1f] transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              Back to Home
+            </button>
+          </div>
           <h1 className="text-4xl font-semibold text-[#1d1d1f] mb-2">Dashboard</h1>
           <p className="text-xl text-muted">Manage your AI-enhanced ENS profile</p>
         </div>
@@ -130,9 +155,28 @@ export default function Dashboard() {
                 </div>
                 <div className="ml-4">
                   <h3 className="text-sm font-medium text-muted">Wallet</h3>
-                  <p className="text-lg font-semibold text-[#1d1d1f]">
-                    {user?.wallet?.address ? formatAddress(user.wallet.address) : 'Not connected'}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={copyWalletAddress}
+                      className="text-lg font-semibold text-[#1d1d1f] hover:text-primary transition-colors cursor-pointer"
+                      title={user?.wallet?.address}
+                    >
+                      {displayName}
+                    </button>
+                    {user?.wallet?.address && (
+                      <button
+                        onClick={copyWalletAddress}
+                        className="p-1 hover:bg-secondary rounded transition-colors"
+                        title={copiedAddress ? "Copied!" : "Copy wallet address"}
+                      >
+                        {copiedAddress ? (
+                          <CheckCircle className="w-4 h-4 text-success" />
+                        ) : (
+                          <Copy className="w-4 h-4 text-muted hover:text-[#1d1d1f]" />
+                        )}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
               <CheckCircle className="w-5 h-5 text-success" />
@@ -284,21 +328,12 @@ export default function Dashboard() {
                     <div className="flex-1">
                       <h3 className="font-semibold mb-1">Deploy to ENS</h3>
                       <p className="text-sm text-muted mb-3">
-                        Create your .base.eth domain with AI context
+                        Create your .basetest.eth domain with AI context
                       </p>
-                      {aiContext && !ensName ? (
-                        <button
-                          onClick={() => setRegistrationStep('registering')}
-                          className="btn-primary"
-                          disabled={!aiContext}
-                        >
-                          <Hexagon className="w-4 h-4 mr-2" />
-                          Create ENS Profile
-                        </button>
-                      ) : ensName ? (
+                      {ensName ? (
                         <span className="text-sm text-success">✓ Deployed to {ensName}</span>
                       ) : (
-                        <span className="text-sm text-muted">Generate AI context first</span>
+                        <span className="text-sm text-muted">Review and confirm AI context below</span>
                       )}
                     </div>
                   </div>
@@ -308,9 +343,10 @@ export default function Dashboard() {
 
             {/* ENS Registration */}
             {registrationStep === 'registering' && aiContext && (
-              <BasenameRegistration
+              <ENSMintOrUpdate
                 aiContext={aiContext}
                 onSuccess={handleRegistrationSuccess}
+                onCancel={() => setRegistrationStep('pending')}
               />
             )}
 
@@ -328,10 +364,19 @@ export default function Dashboard() {
               <div className="card">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-semibold">AI Context Preview</h2>
-                  <button className="btn-secondary text-sm">
-                    <Edit3 className="w-4 h-4 mr-2" />
-                    Edit
-                  </button>
+                  <div className="flex gap-2">
+                    <button className="btn-secondary text-sm">
+                      <Edit3 className="w-4 h-4 mr-2" />
+                      Edit
+                    </button>
+                    <button 
+                      onClick={() => setRegistrationStep('registering')}
+                      className="btn-primary text-sm"
+                    >
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      Confirm & Continue
+                    </button>
+                  </div>
                 </div>
                 
                 <div className="space-y-4">
@@ -393,10 +438,28 @@ export default function Dashboard() {
 
           {/* Right Column - Sidebar */}
           <div className="space-y-6">
+            {/* Existing Basenames */}
+            <BasenamesList />
+
             {/* Quick Actions */}
             <div className="card">
               <h3 className="font-semibold mb-4">Quick Actions</h3>
               <div className="space-y-2">
+                <a
+                  href="https://docs.base.org/docs/tools/network-faucets/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full text-left p-3 rounded-xl hover:bg-secondary transition-colors flex items-center"
+                >
+                  <Droplets className="w-4 h-4 mr-3 text-primary" />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium">Get Testnet ETH</div>
+                    <div className="text-xs text-muted">Base Sepolia faucet</div>
+                  </div>
+                  <ExternalLink className="w-3 h-3 text-muted" />
+                </a>
+                
+                
                 <button className="w-full text-left p-3 rounded-xl hover:bg-secondary transition-colors">
                   <div className="flex items-center">
                     <RefreshCw className="w-4 h-4 mr-3 text-primary" />
@@ -436,6 +499,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                 </button>
+
               </div>
             </div>
 

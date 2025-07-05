@@ -88,7 +88,7 @@ export default function BasenameRegistration({ aiContext, onSuccess }: BasenameR
     <div className="card">
       <div className="flex items-center mb-6">
         <Hexagon className="w-6 h-6 text-primary mr-3" />
-        <h2 className="text-2xl font-semibold">Create Your .base.eth Profile</h2>
+        <h2 className="text-2xl font-semibold">Create Your .basetest.eth Profile</h2>
       </div>
 
       <div className="space-y-6">
@@ -105,7 +105,7 @@ export default function BasenameRegistration({ aiContext, onSuccess }: BasenameR
               maxLength={63}
             />
             <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted text-sm">
-              .base.eth
+              .basetest.eth
             </div>
           </div>
           
@@ -183,11 +183,11 @@ export default function BasenameRegistration({ aiContext, onSuccess }: BasenameR
               {isRegistering ? (
                 <>
                   <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Registering {desiredName}.base.eth...
+                  Registering {desiredName}.basetest.eth...
                 </>
               ) : (
                 <>
-                  Register {desiredName}.base.eth
+                  Register {desiredName}.basetest.eth
                   <span className="ml-2 text-sm opacity-75">
                     ({parseFloat(formatEther(registrationStatus.price)).toFixed(4)} ETH)
                   </span>
@@ -234,6 +234,7 @@ export default function BasenameRegistration({ aiContext, onSuccess }: BasenameR
               <ul className="text-sm text-primary/80 space-y-1">
                 <li>• Your basename will be registered on Base L2</li>
                 <li>• AI context will be stored in ENS text records</li>
+                <li>• Forward and reverse resolution will be set up</li>
                 <li>• You will be able to update your context anytime</li>
                 <li>• AI agents can read your profile for better interactions</li>
               </ul>

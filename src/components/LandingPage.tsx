@@ -2,11 +2,66 @@
 
 import { useRouter } from 'next/navigation'
 import { usePrivy } from '@privy-io/react-auth'
-import { ArrowRight, Zap, Shield, Sparkles, Brain, CheckCircle } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ArrowRight, Zap, Shield, Sparkles, Brain, CheckCircle, Loader2 } from 'lucide-react'
 
 export default function LandingPage() {
   const router = useRouter()
   const { ready, authenticated, login } = usePrivy()
+  const [isProcessingOAuth, setIsProcessingOAuth] = useState(false)
+
+  // Handle OAuth callback redirect
+  useEffect(() => {
+    // Check if this is an OAuth callback
+    const urlParams = new URLSearchParams(window.location.search)
+    const isOAuthCallback = urlParams.has('privy_oauth_state') || urlParams.has('privy_oauth_code')
+    
+    if (isOAuthCallback) {
+      setIsProcessingOAuth(true)
+      
+      if (ready && authenticated) {
+        // Clear the URL parameters and redirect to dashboard
+        window.history.replaceState({}, '', window.location.pathname)
+        // Add a small delay to ensure state is fully updated
+        setTimeout(() => {
+          router.push('/dashboard')
+        }, 100)
+      }
+      // Set a timeout to stop loading if authentication doesn't complete
+      const timeout = setTimeout(() => {
+        if (!authenticated) {
+          setIsProcessingOAuth(false)
+          console.warn('OAuth authentication timed out')
+        }
+      }, 10000) // 10 second timeout
+      
+      return () => clearTimeout(timeout)
+    } else {
+      setIsProcessingOAuth(false)
+    }
+  }, [ready, authenticated, router])
+
+  // Show loading state during OAuth processing
+  if (isProcessingOAuth && !authenticated) {
+    return (
+      <div className="flex-1 flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-[#1d1d1f] mb-2">Connecting your account</h2>
+          <p className="text-muted mb-6">Please wait while we complete the sign-in process...</p>
+          <button
+            onClick={() => {
+              setIsProcessingOAuth(false)
+              window.history.replaceState({}, '', window.location.pathname)
+            }}
+            className="text-sm text-primary hover:text-primary-hover"
+          >
+            Having trouble? Click here to try again
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   const handleGetStarted = () => {
     if (authenticated) {
@@ -33,7 +88,7 @@ export default function LandingPage() {
           </h1>
           
           <p className="text-xl text-muted mb-10 leading-relaxed max-w-2xl mx-auto">
-            Connect your X account and create an AI-enhanced .base.eth profile in 30 seconds. 
+            Connect your X account and create an AI-enhanced .basetest.eth profile in 30 seconds. 
             Make every AI interaction more personal.
           </p>
           
@@ -43,7 +98,7 @@ export default function LandingPage() {
               disabled={!ready}
               className="btn-primary text-lg px-8 py-4"
             >
-              {authenticated ? 'Go to Dashboard' : 'Connect X to Get Started'}
+              {authenticated ? 'Go to Dashboard' : 'Connect to Get Started'}
               <ArrowRight className="w-5 h-5 ml-2" />
             </button>
           </div>
@@ -51,7 +106,7 @@ export default function LandingPage() {
       </section>
 
       {/* Value Props */}
-      <section className="px-4 sm:px-6 lg:px-8 pb-20">
+      <section id="features" className="px-4 sm:px-6 lg:px-8 pb-20">
         <div className="max-w-6xl mx-auto">
           <div className="grid md:grid-cols-3 gap-6">
             <div className="card text-center">
@@ -88,7 +143,7 @@ export default function LandingPage() {
       </section>
 
       {/* How it Works */}
-      <section className="px-4 sm:px-6 lg:px-8 py-20 bg-secondary">
+      <section id="how-it-works" className="px-4 sm:px-6 lg:px-8 py-20 bg-secondary">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-semibold mb-4">How it works</h2>
@@ -133,7 +188,7 @@ export default function LandingPage() {
               <div>
                 <h3 className="text-xl font-semibold mb-2">Deploy to your ENS profile</h3>
                 <p className="text-muted">
-                  Your AI context is stored in your .base.eth ENS profile. Any AI that supports ENS can now provide personalized interactions.
+                  Your AI context is stored in your .basetest.eth ENS profile. Any AI that supports ENS can now provide personalized interactions.
                 </p>
               </div>
             </div>
@@ -192,7 +247,7 @@ export default function LandingPage() {
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-4xl font-semibold mb-4">Ready to enhance your AI interactions?</h2>
           <p className="text-xl text-muted mb-8">
-            Join the future of personalized AI with your own .base.eth identity
+            Join the future of personalized AI with your own .basetest.eth identity
           </p>
           <button 
             onClick={handleGetStarted}

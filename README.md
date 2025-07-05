@@ -1,28 +1,29 @@
 # 🧠 ENS AI Profiles - contx.eth
 
-> Transform your X profile into an AI-aware .base.eth identity in 30 seconds
+> Transform your X profile into an AI-aware .basetest.eth identity in 30 seconds
 
 [![Built for ENS Hackathon](https://img.shields.io/badge/Built%20for-ENS%20Hackathon-blue.svg)](https://hackathon.ens.domains/)
-[![Base L2](https://img.shields.io/badge/Network-Base%20L2-0052FF.svg)](https://base.org/)
+[![Base L2](https://img.shields.io/badge/Network-Base%20Sepolia-0052FF.svg)](https://base.org/)
 [![Next.js](https://img.shields.io/badge/Framework-Next.js%2015-black.svg)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/Language-TypeScript-blue.svg)](https://typescriptlang.org/)
 
 ## ✨ What is contx.eth?
 
-**contx.eth** creates AI-enhanced ENS profiles by analyzing your X (Twitter) account and storing rich context in .base.eth domains. This enables personalized AI interactions across any platform that supports ENS lookups.
+**contx.eth** creates AI-enhanced ENS profiles by analyzing your X (Twitter) account and storing rich context in .basetest.eth domains. This enables personalized AI interactions across any platform that supports ENS lookups.
 
 ### 🎯 Value Proposition
 - **30-second setup**: From X profile to AI-enhanced ENS 
 - **Universal compatibility**: Works with Claude, ChatGPT, and future AI agents
 - **Self-sovereign**: You own your AI context on-chain
-- **Base L2 optimized**: Low gas fees and fast transactions
+- **Base L2 optimized**: Low gas fees and instant transactions
+- **Complete resolution**: Forward and reverse lookup in one atomic transaction
 
 ## 🏆 Hackathon Goals
 
 Targeting **all three ENS prize categories**:
 
 - 🥇 **Most Creative Use Case** ($2,000): Auto-populated AI context in ENS text records
-- 🥈 **Best L2 Primary Names** ($3,000): Base L2 integration with .base.eth domains  
+- 🥈 **Best L2 Primary Names** ($3,000): Base Sepolia integration with .basetest.eth domains  
 - 🥉 **Best ENS Use** ($5,000): ENS as portable AI identity infrastructure
 
 ## 🚀 Quick Start
@@ -30,7 +31,8 @@ Targeting **all three ENS prize categories**:
 ### Prerequisites
 - Node.js 18+ 
 - Privy App ID
-- Base L2 RPC URL
+- Base Sepolia RPC URL
+- Base Sepolia testnet ETH
 
 ### Installation
 
@@ -52,7 +54,7 @@ cp .env.example .env.local
 ```bash
 # Required
 NEXT_PUBLIC_PRIVY_APP_ID=your_privy_app_id
-NEXT_PUBLIC_BASE_RPC_URL=https://mainnet.base.org
+NEXT_PUBLIC_BASE_RPC_URL=https://sepolia.base.org
 
 # Optional (for real Twitter API integration)
 TWITTER_CLIENT_ID=your_twitter_client_id
@@ -90,9 +92,10 @@ Open [http://localhost:3000](http://localhost:3000) to see the app.
 - Creates structured context optimized for AI interactions
 
 ### 3. **Deploy to ENS**
-- Registers .base.eth domain on Base L2
+- Registers .basetest.eth domain on Base Sepolia
+- **Atomic transaction**: NFT mint + registry setup + forward resolution + reverse resolution
 - Stores AI context in ENS text records
-- Batch transaction for registration + context storage
+- Instant registration with complete functionality
 
 ### 4. **AI-Enhanced Interactions**
 - Any AI agent can read your ENS profile
@@ -122,7 +125,7 @@ The app stores structured data in ENS text records:
 ### Core Technologies
 - **Frontend**: Next.js 15, TypeScript, Tailwind CSS
 - **Authentication**: Privy (Web3 + Social)
-- **Blockchain**: Base L2, viem, wagmi
+- **Blockchain**: Base Sepolia, viem, wagmi
 - **Design**: Apple-inspired minimal aesthetic
 - **AI**: Smart context extraction and analysis
 
@@ -134,31 +137,81 @@ src/
 │   ├── api/               # API routes
 │   │   ├── ai/            # AI context generation
 │   │   └── twitter/       # X profile fetching
-│   ├── dashboard/         # User dashboard
+│   ├── dashboard/         # User dashboard with basename management
 │   └── page.tsx          # Landing page
 ├── components/            # React components
-│   ├── BasenameRegistration.tsx
-│   ├── RegistrationSuccess.tsx
+│   ├── BasenameRegistration.tsx    # Registration flow
+│   ├── RegistrationSuccess.tsx     # Success + verification
+│   ├── RegistrationVerification.tsx # Real-time status checking
+│   ├── BasenamesList.tsx          # Existing basenames display
 │   └── ui/               # Reusable components
 ├── lib/                   # Utilities
 │   ├── ens.ts            # ENS contracts & helpers
-│   └── hooks/useENS.ts   # ENS integration hook
+│   └── hooks/            
+│       ├── useENS.ts     # Main ENS integration hook
+│       └── useBasenames.ts # Basename portfolio management
 └── providers/            # Context providers
     └── PrivyProvider.tsx  # Web3 auth wrapper
 ```
 
 ### ENS Integration
 
-**Base L2 Contracts:**
-- Registry: `0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e`
-- Resolver: `0x4976fb03C32e5B8cfe2b6cCB31c09Ba78EBaBa41`
-- Registrar: `0xa58E81fe9b61B5c3fE2AFD33CF304c454AbFc7Cb`
+**Base Sepolia Contracts (Official):**
+- **Registry**: `0x1493b2567056c2181630115660963E13A8E32735`
+- **L2Resolver**: `0x6533C94869D28fAA8dF77cc63f9e2b2D6Cf77eBA`
+- **RegistrarController**: `0x49ae3cc2e3aa768b1e5654f5d3c6002144a59581`
+- **BaseRegistrar (NFT)**: `0xa0c70ec36c010b55e3c434d6c6ebeec50c705794`
+- **ReverseRegistrar**: `0xa0A8401ECF248a9375a0a71C4dedc263dA18dCd7`
 
-**Features:**
-- Real-time availability checking
-- Dynamic pricing from Base registrar
-- Batch transactions (register + setText)
-- Text record management for AI context
+**Key Implementation Features:**
+- ✅ **Atomic registration**: Single transaction for complete functionality
+- ✅ **Forward resolution**: `name.basetest.eth` → address
+- ✅ **Reverse resolution**: address → `name.basetest.eth` (Base-specific format)
+- ✅ **Real-time verification**: Instant status checking post-registration
+- ✅ **Portfolio management**: View all owned basenames with reverse record status
+
+## 🔍 Key Technical Findings
+
+### Base Sepolia Implementation Details
+
+1. **Domain**: Uses `.basetest.eth` instead of `.base.eth` for testnet
+2. **Atomic Registration**: Single `register()` call with resolver data creates:
+   - NFT ownership
+   - Registry ownership  
+   - Forward resolution (name → address)
+   - Reverse resolution (address → name)
+3. **Reverse Records**: Base uses custom node calculation different from standard ENS
+4. **No Commit-Reveal**: Direct registration without front-running protection
+5. **Instant Resolution**: Forward and reverse work immediately after registration
+
+### Transaction Flow Analysis
+
+**Successful Registration Events:**
+```
+1. ETHPaymentProcessed    - Payment confirmation
+2. Transfer               - NFT minted to user
+3. NewOwner              - Registry ownership set
+4. NewResolver           - Resolver configured
+5. NameRegisteredWithRecord - Registration confirmed
+6. AddressChanged        - Forward resolution set (coinType 60)
+7. AddrChanged           - Basic address resolution
+8. BaseReverseClaimed    - Reverse record claimed
+9. NameChanged           - Reverse name set to user.basetest.eth
+10. NameRegistered       - Final confirmation
+```
+
+### Resolution Verification
+
+**Working Implementation:**
+- ✅ NFT ownership via `ownerOf(tokenId)`
+- ✅ Registry ownership via `registry.owner(node)`
+- ✅ Forward resolution via `resolver.addr(node)`
+- ✅ Reverse resolution via Base-specific node calculation
+
+**Verification Component:**
+- Real-time status checking after registration
+- Visual indicators for each resolution type
+- Automatic refresh and status updates
 
 ## 🎨 Design System
 
@@ -173,8 +226,10 @@ src/
 ### Phase 1: Core Platform ✅
 - [x] Twitter OAuth integration
 - [x] AI context generation  
-- [x] Base L2 ENS registration
+- [x] Base Sepolia ENS registration
 - [x] Apple-style UI/UX
+- [x] Atomic registration with complete resolution
+- [x] Real-time verification and portfolio management
 
 ### Phase 2: Enhanced Features 🚧
 - [ ] Real Twitter API integration (currently mock)
@@ -182,12 +237,58 @@ src/
 - [ ] GitHub profile analysis
 - [ ] Farcaster integration
 - [ ] Context editing and versioning
+- [ ] Base mainnet deployment
 
 ### Phase 3: AI Ecosystem 🔮
 - [ ] Partner integrations (ChatGPT, Claude, etc.)
 - [ ] AI agent marketplace
 - [ ] Advanced analytics and insights
 - [ ] Cross-platform identity sync
+
+## 🔧 Developer Experience
+
+### Registration Implementation
+
+```typescript
+const registerBasename = async (options: RegistrationOptions) => {
+  // Prepare resolver data for atomic registration
+  const node = namehash(`${name}.basetest.eth`)
+  const setAddrData = encodeFunctionData({
+    abi: ENS_RESOLVER_ABI,
+    functionName: 'setAddr',
+    args: [node, address],
+  })
+
+  // Single atomic transaction
+  const hash = await walletClient.writeContract({
+    address: REGISTRAR_CONTROLLER_ADDRESS,
+    abi: REGISTRAR_CONTROLLER_ABI,
+    functionName: 'register',
+    args: [{
+      name: formattedName,
+      owner: address,
+      duration: BigInt(duration),
+      resolver: L2_RESOLVER_ADDRESS,
+      data: [setAddrData], // Resolver setup included
+      reverseRecord: true,
+    }],
+    value: price,
+  })
+}
+```
+
+### Verification System
+
+```typescript
+const RegistrationVerification = ({ baseName }) => {
+  // Real-time verification of:
+  // - NFT ownership
+  // - Registry ownership
+  // - Resolver configuration
+  // - Forward resolution
+  // - Reverse resolution (Base format)
+}
+```
 
 ## 🤝 Contributing
 
@@ -222,12 +323,27 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🌟 Acknowledgments
 
 - Built for the [ENS Hackathon](https://hackathon.ens.domains/)
-- Powered by [Base](https://base.org/) L2
+- Powered by [Base](https://base.org/) Sepolia L2
 - Authentication by [Privy](https://privy.io/)
 - Inspired by the future of AI-human interaction
+- Special thanks to the Base team for excellent testnet infrastructure
+
+## 🔬 Technical Achievements
+
+### ENS Innovation
+- **First** to implement atomic .basetest.eth registration with complete resolution
+- **Advanced** reverse record handling for Base's custom implementation
+- **Real-time** verification system for registration status
+- **Portfolio** management for multiple basename ownership
+
+### User Experience
+- **Zero** technical knowledge required
+- **Instant** registration feedback and verification
+- **Clean** Apple-inspired interface
+- **Mobile-first** responsive design
 
 ---
 
 **Made with ❤️ for the ENS Hackathon 2025**
 
-*Transforming social profiles into AI-aware blockchain identities, one .base.eth at a time.*
+*Transforming social profiles into AI-aware blockchain identities, one .basetest.eth at a time.*

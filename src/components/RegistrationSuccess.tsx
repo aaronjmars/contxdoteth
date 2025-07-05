@@ -10,7 +10,10 @@ import {
   Brain,
   Hexagon,
   ArrowRight,
+  AlertTriangle,
 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import RegistrationVerification from './RegistrationVerification'
 
 interface RegistrationSuccessProps {
   baseName: string
@@ -28,6 +31,7 @@ export default function RegistrationSuccess({
   transactionHash, 
   aiContext 
 }: RegistrationSuccessProps) {
+  const router = useRouter()
   const [copied, setCopied] = useState<string | null>(null)
 
   const copyToClipboard = async (text: string, type: string) => {
@@ -43,7 +47,7 @@ export default function RegistrationSuccess({
   const shareProfile = async () => {
     const shareData = {
       title: `Check out my AI-enhanced ENS profile: ${baseName}`,
-      text: `I just created an AI-aware .base.eth profile that helps AI understand me better!`,
+      text: `I just created an AI-aware .basetest.eth profile that helps AI understand me better!`,
       url: `https://contx.eth/profile/${baseName}`,
     }
 
@@ -104,7 +108,7 @@ export default function RegistrationSuccess({
               <Copy className="w-4 h-4" />
             </button>
             <a
-              href={`https://basescan.org/tx/${transactionHash}`}
+              href={`https://sepolia.basescan.org/tx/${transactionHash}`}
               target="_blank"
               rel="noopener noreferrer"
               className="p-2 hover:bg-secondary rounded-lg transition-colors"
@@ -170,6 +174,9 @@ export default function RegistrationSuccess({
           <ArrowRight className="w-4 h-4 ml-2" />
         </button>
       </div>
+
+      {/* Registration Verification */}
+      <RegistrationVerification baseName={baseName} />
 
       {/* Next Steps */}
       <div className="card">

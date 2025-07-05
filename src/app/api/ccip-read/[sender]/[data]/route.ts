@@ -79,10 +79,10 @@ async function extractUsernameFromNode(node: string): Promise<string> {
 // Handle CCIP-Read requests from ENS resolver
 export async function GET(
   request: NextRequest,
-  { params }: { params: { sender: string; data: string } }
+  { params }: { params: Promise<{ sender: string; data: string }> }
 ) {
   try {
-    const { sender, data } = params
+    const { sender, data } = await params
     
     console.log('🌉 CCIP-Read request:', { sender, data })
     

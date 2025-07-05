@@ -250,19 +250,28 @@ export async function GET(
     console.log('📦 Data length:', data.length)
     
     const callData = Buffer.from(data.slice(2), 'hex')
-    const selector = '0x' + callData.slice(0, 4).toString('hex')
     
+    // CCIP-Read data structure: node(32) + selector(4) + parameters
+    if (callData.length < 36) {
+      return NextResponse.json({ 
+        error: 'Invalid data length - need at least 36 bytes' 
+      }, { status: 400, headers: corsHeaders })
+    }
+    
+    // Extract components
+    const node = '0x' + callData.slice(0, 32).toString('hex')
+    const selector = '0x' + callData.slice(32, 36).toString('hex')
+    const parametersData = callData.slice(36)
+    
+    console.log('🔗 Extracted node:', node)
     console.log('🎯 Function selector:', selector)
-    console.log('📦 Call data length:', callData.length)
+    console.log('📦 Parameters length:', parametersData.length)
 
     let result: string
 
     if (selector === '0x3b3b57de') {
       // addr(bytes32) - Address resolution
       console.log('📍 Processing address resolution...')
-      
-      const node = '0x' + callData.slice(4, 36).toString('hex')
-      console.log('🔗 Extracted node:', node)
       
       const username = await findUsernameFromNode(node)
       console.log('👤 Resolved username:', username)
@@ -287,21 +296,24 @@ export async function GET(
       // text(bytes32,string) - Text record resolution
       console.log('📝 Processing text record resolution...')
       
-      const parametersData = ('0x' + callData.slice(4).toString('hex')) as `0x${string}`
-      console.log('📝 Parameters data:', parametersData)
+      // For text function, decode the key from remaining parameters
+      if (parametersData.length === 0) {
+        return NextResponse.json({ 
+          error: 'Missing text key parameter' 
+        }, { status: 400, headers: corsHeaders })
+      }
+      
+      // Decode the key parameter (string)
+      const parametersHex = ('0x' + parametersData.toString('hex')) as `0x${string}`
+      console.log('📝 Parameters hex:', parametersHex)
       
       const decoded = decodeAbiParameters(
-        [
-          { name: 'node', type: 'bytes32' },
-          { name: 'key', type: 'string' }
-        ],
-        parametersData
+        [{ name: 'key', type: 'string' }],
+        parametersHex
       )
       
-      const node = decoded[0] as string
-      const key = decoded[1] as string
+      const key = decoded[0] as string
       
-      console.log('🔗 Decoded node:', node)
       console.log('🔑 Decoded key:', key)
       
       const username = await findUsernameFromNode(node)

@@ -87,17 +87,100 @@ async function getAllUsernames(): Promise<string[]> {
     })
     
     console.log(`📋 Raw events found: ${events.length}`)
-    events.forEach((event, i) => {
-      console.log(`📋 Event ${i}:`, {
-        username: event.args.username,
-        owner: event.args.owner,
-        blockNumber: event.blockNumber
-      })
+    
+    // For indexed strings, we need to get the actual data from the transaction logs
+    // Let's try a different approach - get ALL logs and decode manually
+    const logs = await basePublicClient.getLogs({
+      address: CONTX_REGISTRY_ADDRESS,
+      fromBlock: BigInt(0),
+      toBlock: 'latest'
     })
     
-    const usernames = events.map(event => event.args.username).filter(Boolean) as string[]
+    console.log(`📋 Raw logs found: ${logs.length}`)
+    
+    const usernames: string[] = []
+    
+    // Decode each log manually to get the actual username string
+    for (const log of logs) {
+      try {
+        // Check if this is a SubdomainRegistered event
+        if (log.topics[0] === '0x66f79d321098f331689118429a90f81eaf47968e7edb58b0bf2479bed8bded65') {
+          // Decode the log data (non-indexed parameters)
+          // Since username is indexed, we need a different approach
+          
+          // For now, let's extract from transaction input data
+          console.log('📋 Found SubdomainRegistered log:', {
+            blockNumber: log.blockNumber,
+            transactionHash: log.transactionHash,
+            topics: log.topics,
+            data: log.data
+          })
+          
+          // Get the transaction to see the function call
+          const tx = await basePublicClient.getTransaction({
+            hash: log.transactionHash
+          })
+          
+          console.log('📋 Transaction input:', tx.input)
+          
+          // Try to decode the register function call to get the username
+          // This is a fallback approach
+          if (tx.input && tx.input.length > 10) {
+            try {
+              // If this is a register call, decode it
+              const decoded = decodeAbiParameters(
+                [
+                  { name: 'username', type: 'string' },
+                  { name: 'name', type: 'string' },
+                  { name: 'bio', type: 'string' }
+                ],
+                ('0x' + tx.input.slice(10)) as `0x${string}` // Remove function selector
+              )
+              
+              const username = decoded[0] as string
+              console.log('📋 Decoded username from tx:', username)
+              
+              if (username && !usernames.includes(username)) {
+                usernames.push(username)
+              }
+            } catch (decodeError) {
+              console.log('📋 Could not decode transaction input:', decodeError)
+            }
+          }
+        }
+      } catch (logError) {
+        console.log('📋 Error processing log:', logError)
+        continue
+      }
+    }
     
     console.log(`📋 Extracted ${usernames.length} usernames:`, usernames)
+    
+    // If we couldn't get usernames from transaction data, fall back to a simpler approach
+    if (usernames.length === 0) {
+      console.log('📋 Falling back to common username testing...')
+      
+      // Test common usernames by calling the contract directly
+      const testUsernames = ['aaron', 'alice', 'bob', 'test', 'demo', 'admin', 'user', 'dev']
+      
+      for (const testUsername of testUsernames) {
+        try {
+          const profile = await basePublicClient.readContract({
+            address: CONTX_REGISTRY_ADDRESS,
+            abi: REGISTRY_ABI,
+            functionName: 'getProfile',
+            args: [testUsername],
+          }) as [Address, string, boolean]
+          
+          if (profile[2]) { // exists = true
+            usernames.push(testUsername)
+            console.log('📋 Found existing username:', testUsername)
+          }
+        } catch {
+          // Username doesn't exist, continue
+        }
+      }
+    }
     
     // Cache the results
     usernamesCache = usernames

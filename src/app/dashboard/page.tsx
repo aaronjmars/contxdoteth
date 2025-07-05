@@ -19,7 +19,6 @@ import {
   ExternalLink 
 } from 'lucide-react'
 import { InteractiveHoverButton } from '@/components/ui/interactive-hover-button'
-import { useENS } from '@/lib/hooks/useENS'
 
 // Contract ABIs for custom namespace
 const CONTX_REGISTRY_ABI = [
@@ -524,7 +523,7 @@ export default function DashboardNew() {
                       text="Register Another"
                       onClick={() => {
                         setRegistrationComplete(false)
-                        _setUsername('')
+                        // _setUsername('')
                         setRegisteredName('')
                         setTransactionHash('')
                       }}

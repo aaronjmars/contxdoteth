@@ -176,7 +176,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(results)
 }
 
-export async function POST(_request: NextRequest) {
+export async function POST() {
   return NextResponse.json({
     message: 'Test Gateway - Use GET method',
     usage: 'GET /api/test-gateway'

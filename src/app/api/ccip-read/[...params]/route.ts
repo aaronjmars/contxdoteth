@@ -1,18 +1,15 @@
-// src/app/api/ccip-read/[...params]/route.ts - Production Version
+// src/app/api/ccip-read/[...params]/route.ts - Final Clean Version
 import { NextRequest, NextResponse } from 'next/server'
 import { createPublicClient, http, Address, keccak256, encodePacked } from 'viem'
 import { base } from 'viem/chains'
 
-// YOUR DEPLOYED CONTRACT ADDRESS
 const REGISTRY_ADDRESS = '0xa2bbe9b6a4ca01806b1cfac4174e4976ce2b0d70' as Address
 
-// Base Mainnet public client
 const basePublicClient = createPublicClient({
   chain: base,
   transport: http('https://mainnet.base.org'),
 })
 
-// ContxRegistry ABI
 const REGISTRY_ABI = [
   {
     inputs: [{ name: 'username', type: 'string' }],
@@ -51,7 +48,6 @@ const REGISTRY_ABI = [
   },
 ] as const
 
-// Proper namehash implementation
 function namehash(name: string): string {
   if (name === '') {
     return '0x0000000000000000000000000000000000000000000000000000000000000000'
@@ -69,11 +65,9 @@ function namehash(name: string): string {
   return hash
 }
 
-// Production username extraction
 async function extractUsernameFromNode(node: string): Promise<string> {
   console.log('🔍 Extracting username for node:', node)
   
-  // Common usernames to try (expand this list as needed)
   const commonUsernames = [
     'alice', 'bob', 'charlie', 'diana', 'eve', 'frank', 'grace', 'henry',
     'test', 'demo', 'admin', 'user', 'dev', 'api', 'app', 'web', 
@@ -81,13 +75,11 @@ async function extractUsernameFromNode(node: string): Promise<string> {
     'john', 'jane', 'mike', 'sarah', 'david', 'emma', 'alex', 'lisa'
   ]
   
-  // Try to find matching username
   for (const username of commonUsernames) {
     const calculatedNode = namehash(`${username}.contx.eth`)
     if (calculatedNode.toLowerCase() === node.toLowerCase()) {
       console.log('✅ Found username:', username)
       
-      // Verify the username exists in registry
       try {
         const profile = await basePublicClient.readContract({
           address: REGISTRY_ADDRESS,
@@ -96,27 +88,25 @@ async function extractUsernameFromNode(node: string): Promise<string> {
           args: [username],
         }) as [Address, string, boolean]
         
-        if (profile[2]) { // exists = true
+        if (profile[2]) {
           return username
         }
-      } catch (error) {
+      } catch {
         console.log('❌ Username not registered:', username)
         continue
       }
     }
   }
   
-  console.log('❌ Username not found for node:', node)
   throw new Error(`Username not found for node: ${node}`)
 }
 
-// Main CCIP-Read handler
 export async function GET(
   request: NextRequest,
   { params }: { params: { params: string[] } }
 ) {
   try {
-    console.log('🌉 Production CCIP-Read Gateway Request')
+    console.log('🌉 CCIP-Read Gateway Request')
     
     const [sender, data] = params.params || []
     
@@ -127,18 +117,10 @@ export async function GET(
       )
     }
 
-    console.log('📋 Request details:', { 
-      sender, 
-      dataLength: data.length,
-      registry: REGISTRY_ADDRESS,
-      network: 'Base Mainnet'
-    })
-
-    // Decode CCIP-Read data
     let decodedBytes: Buffer
     try {
       decodedBytes = Buffer.from(data.slice(2), 'hex')
-    } catch (error) {
+    } catch {
       return NextResponse.json(
         { error: 'Invalid hex data' },
         { status: 400 }
@@ -157,7 +139,6 @@ export async function GET(
     
     console.log('📊 Decoded:', { node, selector })
 
-    // Extract username from node
     const username = await extractUsernameFromNode(node)
     console.log('👤 Username:', username)
 
@@ -165,8 +146,6 @@ export async function GET(
 
     if (selector === '0x3b3b57de') {
       // addr(bytes32) - address resolution
-      console.log('🏠 Resolving address for:', username)
-      
       const address = await basePublicClient.readContract({
         address: REGISTRY_ADDRESS,
         abi: REGISTRY_ABI,
@@ -174,23 +153,16 @@ export async function GET(
         args: [username],
       }) as Address
 
-      console.log('✅ Resolved address:', address)
-
-      // Encode address as bytes32 (padded to 32 bytes)
       const addressBytes = Buffer.alloc(32)
-      Buffer.from(address.slice(2), 'hex').copy(addressBytes, 12) // Address is 20 bytes, pad with 12 zeros
+      Buffer.from(address.slice(2), 'hex').copy(addressBytes, 12)
       result = '0x' + addressBytes.toString('hex')
       
     } else if (selector === '0x59d1d43c') {
       // text(bytes32,string) - text record resolution
-      
-      // Extract key parameter from the encoded data
-      const keyLengthOffset = 36 + 32 // Skip node + selector + offset
-      const keyLength = decodedBytes.readUInt32BE(keyLengthOffset + 28) // Last 4 bytes of length
+      const keyLengthOffset = 36 + 32
+      const keyLength = decodedBytes.readUInt32BE(keyLengthOffset + 28)
       const keyStart = keyLengthOffset + 32
       const key = decodedBytes.slice(keyStart, keyStart + keyLength).toString('utf8')
-      
-      console.log('📝 Resolving text for:', username, 'key:', key)
       
       const textValue = await basePublicClient.readContract({
         address: REGISTRY_ADDRESS,
@@ -199,76 +171,67 @@ export async function GET(
         args: [username, key],
       }) as string
 
-      console.log('✅ Raw text value:', textValue)
-
       // Convert comma-separated values to JSON arrays for AI context fields
       let processedValue = textValue
       if (key.startsWith('ai.') && textValue && !textValue.startsWith('[') && !textValue.startsWith('{')) {
-        // Convert comma-separated string to JSON array
         const items = textValue.split(',').map(item => item.trim())
         processedValue = JSON.stringify(items)
-        console.log('🔄 Converted to JSON array:', processedValue)
       }
 
-      console.log('✅ Final processed value:', processedValue)
-
-      // Encode string result for ABI
       const stringBytes = Buffer.from(processedValue, 'utf8')
       const lengthBytes = Buffer.alloc(32)
-      lengthBytes.writeUInt32BE(stringBytes.length, 28) // Write length in last 4 bytes
+      lengthBytes.writeUInt32BE(stringBytes.length, 28)
       
       const paddingLength = 32 - (stringBytes.length % 32)
       const padding = paddingLength === 32 ? Buffer.alloc(0) : Buffer.alloc(paddingLength)
       
       const encodedResult = Buffer.concat([
-        Buffer.alloc(32), // Offset (will be set below)
-        lengthBytes,      // Length of string
-        stringBytes,      // String data
-        padding           // Padding to 32-byte boundary
+        Buffer.alloc(32),
+        lengthBytes,
+        stringBytes,
+        padding
       ])
       
-      // Set offset to 32 (0x20)
       encodedResult.writeUInt32BE(32, 28)
-      
       result = '0x' + encodedResult.toString('hex')
       
     } else {
-      console.log('❌ Unsupported selector:', selector)
       return NextResponse.json(
         { error: `Function not supported: ${selector}` },
         { status: 404 }
       )
     }
 
-    console.log('✅ CCIP-Read success for:', username)
-    console.log('📤 Result length:', result.length)
-    
     return NextResponse.json({ data: result })
 
-  } catch (error) {
-    console.error('❌ CCIP-Read error:', error)
+  } catch (err) {
+    console.error('❌ CCIP-Read error:', err)
     return NextResponse.json(
       { 
         error: 'Resolution failed',
-        details: error instanceof Error ? error.message : 'Unknown error',
-        registry: REGISTRY_ADDRESS,
-        network: 'Base Mainnet'
+        details: err instanceof Error ? err.message : 'Unknown error',
       },
       { status: 500 }
     )
   }
 }
 
-// Health check and direct testing endpoint
+interface RequestBody {
+  username: string
+  method: string
+  key?: string
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { username, method, key } = await request.json()
+    const body = await request.json() as RequestBody
+    const { username, method, key } = body
     
     if (!username) {
       return NextResponse.json({ error: 'Username required' }, { status: 400 })
     }
 
-    let result: any
+    let result: unknown
 
     switch (method) {
       case 'getProfile':
@@ -293,21 +256,21 @@ export async function POST(request: NextRequest) {
         if (!key) {
           return NextResponse.json({ error: 'Key required for getText' }, { status: 400 })
         }
-        result = await basePublicClient.readContract({
+        const textResult = await basePublicClient.readContract({
           address: REGISTRY_ADDRESS,
           abi: REGISTRY_ABI,
           functionName: 'getText',
           args: [username, key],
-        })
+        }) as string
         
-        // Also show processed version for AI fields
-        let processed = result
-        if (key.startsWith('ai.') && result && !String(result).startsWith('[') && !String(result).startsWith('{')) {
-          const items = String(result).split(',').map(item => item.trim())
+        // Process AI fields
+        let processed: string = textResult
+        if (key.startsWith('ai.') && textResult && !textResult.startsWith('[') && !textResult.startsWith('{')) {
+          const items = textResult.split(',').map(item => item.trim())
           processed = JSON.stringify(items)
         }
         
-        result = { raw: result, processed: processed }
+        result = { raw: textResult, processed }
         break
 
       case 'isAvailable':
@@ -331,13 +294,10 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString()
     })
 
-  } catch (error) {
-    console.error('Health check error:', error)
+  } catch (err) {
     return NextResponse.json({
       error: 'Query failed',
-      details: error instanceof Error ? error.message : 'Unknown error',
-      registry: REGISTRY_ADDRESS,
-      network: 'Base Mainnet'
+      details: err instanceof Error ? err.message : 'Unknown error',
     }, { status: 500 })
   }
 }

@@ -378,14 +378,7 @@ export function nameToTokenId(name: string): bigint {
 }
 
 export function packResolverData(
-  nameLabel: string, // Just the name without .basetest.eth
-  ownerAddress: Address, 
-  aiContext: {
-    bio?: string[]
-    topics?: string[]
-    traits?: string[]
-    style?: { all?: string[] }
-  }
+  nameLabel: string // Just the name without .basetest.eth
 ): `0x${string}`[] {
   // Try multiple namehash calculation methods to find the right one
   const fullName = `${nameLabel}.basetest.eth`

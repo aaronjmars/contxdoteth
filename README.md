@@ -93,9 +93,9 @@ Open [http://localhost:3000](http://localhost:3000) to see the app.
 
 ### 3. **Deploy to ENS**
 - Registers .basetest.eth domain on Base Sepolia
-- **Atomic transaction**: NFT mint + registry setup + forward resolution + reverse resolution
-- Stores AI context in ENS text records
-- Instant registration with complete functionality
+- **Atomic transaction**: NFT mint + registry setup + forward resolution + reverse resolution + **AI context storage**
+- Stores comprehensive AI context in ENS text records during registration
+- Instant registration with complete functionality and AI-enhanced profile
 
 ### 4. **AI-Enhanced Interactions**
 - Any AI agent can read your ENS profile
@@ -165,10 +165,30 @@ src/
 
 **Key Implementation Features:**
 - ✅ **Atomic registration**: Single transaction for complete functionality
+- ✅ **AI context storage**: All AI data stored as ENS text records during registration
 - ✅ **Forward resolution**: `name.basetest.eth` → address
 - ✅ **Reverse resolution**: address → `name.basetest.eth` (Base-specific format)
 - ✅ **Real-time verification**: Instant status checking post-registration
 - ✅ **Portfolio management**: View all owned basenames with reverse record status
+- ✅ **Text records**: Complete AI context automatically stored on-chain
+
+## ✅ **BREAKTHROUGH: Text Records Working!**
+
+**🎉 Major Achievement**: Successfully implemented AI context storage in ENS text records during atomic registration on Base Sepolia!
+
+**Verified Transaction**: [`0x2802c7bb...`](https://sepolia.basescan.org/tx/0x2802c7bb0c3f95beca29cd995158fd3109ee434081519a2d6eb27c8d0adb6e5b)
+
+**8 Text Records Stored On-Chain:**
+- ✅ `description` - Human-readable bio
+- ✅ `keywords` - Topic keywords  
+- ✅ `ai.bio` - JSON structured bio array
+- ✅ `ai.style` - JSON communication style object
+- ✅ `ai.topics` - JSON topics array
+- ✅ `ai.traits` - JSON personality traits array
+- ✅ `ai.updated` - ISO timestamp
+- ✅ `ai.version` - Schema version
+
+**Impact**: Basenames are now truly AI-aware blockchain identities with rich context stored directly on Base L2!
 
 ## 🔍 Key Technical Findings
 
@@ -195,9 +215,18 @@ src/
 5. NameRegisteredWithRecord - Registration confirmed
 6. AddressChanged        - Forward resolution set (coinType 60)
 7. AddrChanged           - Basic address resolution
-8. BaseReverseClaimed    - Reverse record claimed
-9. NameChanged           - Reverse name set to user.basetest.eth
-10. NameRegistered       - Final confirmation
+8. TextChanged (×8)      - AI context stored in text records:
+   - description         - Human-readable bio
+   - keywords           - Topic keywords
+   - ai.bio             - JSON structured bio
+   - ai.style           - JSON communication style
+   - ai.topics          - JSON topics array
+   - ai.traits          - JSON personality traits
+   - ai.updated         - ISO timestamp
+   - ai.version         - Schema version
+9. BaseReverseClaimed    - Reverse record claimed
+10. NameChanged          - Reverse name set to user.basetest.eth
+11. NameRegistered       - Final confirmation
 ```
 
 ### Resolution Verification
@@ -227,9 +256,11 @@ src/
 - [x] Twitter OAuth integration
 - [x] AI context generation  
 - [x] Base Sepolia ENS registration
+- [x] **AI context storage in ENS text records**
 - [x] Apple-style UI/UX
 - [x] Atomic registration with complete resolution
 - [x] Real-time verification and portfolio management
+- [x] **Text records working end-to-end**
 
 ### Phase 2: Enhanced Features 🚧
 - [ ] Real Twitter API integration (currently mock)
@@ -259,7 +290,17 @@ const registerBasename = async (options: RegistrationOptions) => {
     args: [node, address],
   })
 
-  // Single atomic transaction
+  // Prepare AI context text records
+  const ensRecords = formatAIContextForENS(aiContext)
+  const textRecordData = Object.entries(ensRecords).map(([key, value]) => 
+    encodeFunctionData({
+      abi: ENS_RESOLVER_ABI,
+      functionName: 'setText',
+      args: [node, key, value],
+    })
+  )
+
+  // Single atomic transaction with AI context
   const hash = await walletClient.writeContract({
     address: REGISTRAR_CONTROLLER_ADDRESS,
     abi: REGISTRAR_CONTROLLER_ABI,
@@ -269,7 +310,7 @@ const registerBasename = async (options: RegistrationOptions) => {
       owner: address,
       duration: BigInt(duration),
       resolver: L2_RESOLVER_ADDRESS,
-      data: [setAddrData], // Resolver setup included
+      data: [setAddrData, ...textRecordData], // Address + AI context
       reverseRecord: true,
     }],
     value: price,
@@ -331,10 +372,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🔬 Technical Achievements
 
 ### ENS Innovation
-- **First** to implement atomic .basetest.eth registration with complete resolution
+- **First** to implement atomic .basetest.eth registration with complete resolution + AI context
 - **Advanced** reverse record handling for Base's custom implementation
 - **Real-time** verification system for registration status
 - **Portfolio** management for multiple basename ownership
+- **Complete** AI context storage in ENS text records during registration
+- **Verified** end-to-end text record functionality on Base Sepolia
 
 ### User Experience
 - **Zero** technical knowledge required

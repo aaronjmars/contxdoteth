@@ -5,17 +5,11 @@ import {
   BASE_ENS_ADDRESSES,
   ENS_RESOLVER_ABI,
   REGISTRAR_CONTROLLER_ABI,
-  BASE_REGISTRAR_NFT_ABI,
-  ENS_REGISTRY_ABI,
   BASENAME_L2_RESOLVER_ADDRESS,
-  basenameNodehash,
-  nameToTokenId,
   isValidBasename,
   formatBasename,
   formatAIContextForENS,
   mainnetPublicClient,
-  type AIContextRecord,
-  type RegisterRequest,
 } from '../ens'
 
 export interface RegistrationOptions {
@@ -152,9 +146,9 @@ export function useENS() {
         throw new Error('Could not determine price')
       }
 
-      // Prepare resolver data to set address during registration
+      // Prepare resolver data to set address and AI context during registration
       const node = namehash(`${formattedName}.basetest.eth`)
-      console.log('📊 Setting address for node:', node)
+      console.log('📊 Setting address and AI context for node:', node)
       
       const setAddrData = encodeFunctionData({
         abi: ENS_RESOLVER_ABI,
@@ -163,6 +157,19 @@ export function useENS() {
       })
       
       console.log('📊 setAddr data:', setAddrData)
+      
+      // Prepare AI context text records
+      const ensRecords = formatAIContextForENS(aiContext)
+      const textRecordData = Object.entries(ensRecords).map(([key, value]) => {
+        console.log(`📊 Adding text record: ${key} = ${value}`)
+        return encodeFunctionData({
+          abi: ENS_RESOLVER_ABI,
+          functionName: 'setText',
+          args: [node, key, value],
+        })
+      })
+      
+      console.log('📊 Total text records to set:', textRecordData.length)
 
       // Create registration request
       const registerRequest = {
@@ -170,7 +177,7 @@ export function useENS() {
         owner: address,
         duration: BigInt(duration),
         resolver: BASENAME_L2_RESOLVER_ADDRESS,
-        data: [setAddrData], // Set address during registration
+        data: [setAddrData, ...textRecordData], // Set address and AI context during registration
         reverseRecord: true,
       }
       
@@ -208,8 +215,9 @@ export function useENS() {
         transactionHash: hash,
         baseName: `${formattedName}.basetest.eth`,
         receipt,
-        textRecordsSet: false,
-        message: `✅ Registration complete! Check BaseScan: https://sepolia.basescan.org/tx/${hash}`
+        textRecordsSet: true,
+        textRecordsCount: textRecordData.length,
+        message: `✅ Registration complete with ${textRecordData.length} AI context records! Check BaseScan: https://sepolia.basescan.org/tx/${hash}`
       }
     } catch (error) {
       console.error('❌ REGISTRATION ERROR:', error)
@@ -237,7 +245,7 @@ export function useENS() {
       const multicallData = keys.map(key => encodeFunctionData({
         abi: ENS_RESOLVER_ABI,
         functionName: 'setText',
-        args: [node, key, ensRecords[key as keyof AIContextRecord]],
+        args: [node, key, ensRecords[key]],
       }))
 
       const hash = await walletClient.writeContract({

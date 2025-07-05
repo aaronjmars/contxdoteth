@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createPublicClient, http, Address, keccak256, encodePacked, decodeAbiParameters } from 'viem'
+import { createPublicClient, http, Address, keccak256, encodePacked, decodeAbiParameters, fallback } from 'viem'
 import { base } from 'viem/chains'
 
 const REGISTRY_ADDRESS = '0xa2bbe9b6a4ca01806b1cfac4174e4976ce2b0d70' as Address
 
 const basePublicClient = createPublicClient({
   chain: base,
-  transport: http('https://mainnet.base.org'),
+  transport: fallback([
+    http('https://base.llamarpc.com'),
+    http('https://mainnet.base.org'),
+    http('https://base-mainnet.g.alchemy.com/v2/demo'),
+    http('https://base.gateway.tenderly.co'),
+  ]),
 })
 
 const REGISTRY_ABI = [
@@ -63,27 +68,59 @@ async function extractUsernameFromNode(node: string): Promise<string> {
   console.log('🔍 Searching for username with node:', node)
   
   try {
-    // Get all SubdomainRegistered events from the contract
-    const eventSignature = 'SubdomainRegistered(string,address)'
-    const eventTopic = keccak256(new TextEncoder().encode(eventSignature))
+    // First, try common patterns for quick resolution
+    const commonPatterns = [
+      'aaron', 'alice', 'bob', 'test', 'demo', 'admin', 'user', 'dev', 'example'
+    ]
     
-    const events = await basePublicClient.getLogs({
-      address: REGISTRY_ADDRESS,
-      fromBlock: 'earliest',
-      toBlock: 'latest'
-    })
-    
-    console.log(`📋 Found ${events.length} total events`)
-    
-    // Filter for SubdomainRegistered events
-    const registrationEvents = events.filter(event => 
-      event.topics && event.topics[0] === eventTopic
-    )
-    
-    console.log(`📋 Found ${registrationEvents.length} registration events`)
-    
-    // Extract usernames from events and check each one
-    for (const event of registrationEvents) {
+    console.log('🔍 Trying common username patterns first...')
+    for (const username of commonPatterns) {
+      const calculatedNode = namehash(`${username}.contx.eth`)
+      if (calculatedNode.toLowerCase() === node.toLowerCase()) {
+        console.log('✅ Found username via common pattern:', username)
+        
+        // Verify this username actually exists in the registry
+        try {
+          const profile = await basePublicClient.readContract({
+            address: REGISTRY_ADDRESS,
+            abi: REGISTRY_ABI,
+            functionName: 'getProfile',
+            args: [username],
+          }) as [Address, string, boolean]
+          
+          if (profile[2]) { // exists
+            return username
+          }
+        } catch {
+          console.log(`Username ${username} matches node but not found in registry`)
+          continue
+        }
+      }
+    }
+
+    // Try to get events for more comprehensive search
+    try {
+      console.log('🔍 Fetching registration events...')
+      const eventSignature = 'SubdomainRegistered(string,address)'
+      const eventTopic = keccak256(new TextEncoder().encode(eventSignature))
+      
+      const events = await basePublicClient.getLogs({
+        address: REGISTRY_ADDRESS,
+        fromBlock: 'earliest',
+        toBlock: 'latest'
+      })
+      
+      console.log(`📋 Found ${events.length} total events`)
+      
+      // Filter for SubdomainRegistered events
+      const registrationEvents = events.filter(event => 
+        event.topics && event.topics[0] === eventTopic
+      )
+      
+      console.log(`📋 Found ${registrationEvents.length} registration events`)
+      
+      // Extract usernames from events and check each one
+      for (const event of registrationEvents) {
       if (event.transactionHash) {
         try {
           // Get the transaction receipt to get the decoded event data
@@ -144,7 +181,11 @@ async function extractUsernameFromNode(node: string): Promise<string> {
       }
     }
     
-    console.log('🔄 Events approach failed, falling back to pattern matching...')
+    } catch (eventFetchError) {
+      console.log('⚠️ Failed to fetch events, falling back to pattern matching:', eventFetchError)
+    }
+    
+    console.log('🔄 Falling back to comprehensive pattern matching...')
     
     // Fallback to comprehensive pattern matching
     const patterns = [

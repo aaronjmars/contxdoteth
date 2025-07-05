@@ -309,26 +309,49 @@ export async function GET(
       // text(bytes32,string) - Text record resolution
       console.log('📝 Processing text record resolution...')
       
-      // For text function, decode the key from remaining parameters
-      if (parametersData.length === 0) {
-        return NextResponse.json({ 
-          error: 'Missing text key parameter' 
-        }, { status: 400, headers: corsHeaders })
-      }
-      
-      // The parameters only contain the key (string) since node was already extracted
+      // Debug the exact parameter structure
       const parametersHex = ('0x' + parametersData.toString('hex')) as `0x${string}`
       console.log('📝 Parameters hex:', parametersHex)
+      console.log('📝 Parameters length:', parametersData.length)
       
-      const decoded = decodeAbiParameters(
-        [{ name: 'key', type: 'string' }],
-        parametersHex
-      )
+      // Try to manually parse the string from the end of the data
+      // Look for the string "name" or "bio" in the hex
+      const hexString = parametersData.toString('hex')
+      console.log('📝 Raw hex:', hexString)
       
-      const key = decoded[0] as string
+      // Convert hex chunks to see what's in there
+      for (let i = 0; i < hexString.length; i += 64) {
+        const chunk = hexString.slice(i, i + 64)
+        console.log(`📝 Chunk ${i/64}:`, chunk)
+        
+        // Try to decode as string
+        try {
+          const bytes = Buffer.from(chunk, 'hex')
+          const asString = bytes.toString('utf8').replace(/\0/g, '')
+          if (asString.length > 0 && /^[a-zA-Z0-9]+$/.test(asString)) {
+            console.log(`📝   As string: "${asString}"`)
+          }
+        } catch (e) {
+          console.log(e);
+        }
+      }
       
-      console.log('🔑 Decoded key:', `"${key}"`)
-      console.log('📏 Key length:', key.length)
+      // For now, extract key manually from the hex
+      let key = ''
+      
+      // Look for common keys in hex: "name" = 6e616d65, "bio" = 62696f
+      if (hexString.includes('6e616d65')) {
+        key = 'name'
+        console.log('📝 Found "name" in hex data')
+      } else if (hexString.includes('62696f')) {
+        key = 'bio'
+        console.log('📝 Found "bio" in hex data')
+      } else {
+        console.log('📝 Could not find known key in hex data')
+        key = 'unknown'
+      }
+      
+      console.log('🔑 Extracted key:', `"${key}"`)
       
       try {
         const username = await findUsernameFromNode(node)

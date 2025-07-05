@@ -1,4 +1,3 @@
-// src/app/api/ccip-read/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createPublicClient, http, Address, keccak256, encodePacked } from 'viem'
 import { base } from 'viem/chains'
@@ -58,45 +57,32 @@ function namehash(name: string): string {
   return hash
 }
 
+// Simple function to extract username from ENS node
 async function extractUsernameFromNode(node: string): Promise<string> {
-  const commonUsernames = ['alice', 'bob', 'test', 'demo', 'charlie', 'diana']
+  console.log('🔍 Extracting username from node:', node)
+  
+  // Try common usernames first
+  const commonUsernames = ['aaron', 'alice', 'bob', 'test', 'demo', 'charlie', 'diana', 'john', 'jane', 'admin', 'user']
   
   for (const username of commonUsernames) {
     const calculatedNode = namehash(`${username}.contx.eth`)
     if (calculatedNode.toLowerCase() === node.toLowerCase()) {
-      try {
-        const profile = await basePublicClient.readContract({
-          address: REGISTRY_ADDRESS,
-          abi: REGISTRY_ABI,
-          functionName: 'getProfile',
-          args: [username],
-        }) as [Address, string, boolean]
-        
-        if (profile[2]) {
-          return username
-        }
-      } catch {
-        continue
-      }
+      console.log('✅ Found username:', username)
+      return username
     }
   }
   
-  throw new Error(`Username not found for node: ${node}`)
+  // If not found in common names, we need a different approach
+  throw new Error(`Username extraction failed for node: ${node}. Consider adding the username to common list or implementing a proper reverse lookup.`)
 }
 
 // Handle CCIP-Read requests from ENS resolver
-export async function GET(request: NextRequest) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { sender: string; data: string } }
+) {
   try {
-    const url = new URL(request.url)
-    
-    // Extract sender and data from URL path
-    const pathParts = url.pathname.split('/').filter(Boolean)
-    if (pathParts.length < 4) {
-      return NextResponse.json({ error: 'Invalid CCIP-Read URL' }, { status: 400 })
-    }
-    
-    const sender = pathParts[2]
-    const data = pathParts[3]
+    const { sender, data } = params
     
     console.log('🌉 CCIP-Read request:', { sender, data })
     
@@ -183,78 +169,6 @@ export async function GET(request: NextRequest) {
     console.error('❌ CCIP-Read error:', err)
     return NextResponse.json({
       error: 'Resolution failed',
-      details: err instanceof Error ? err.message : 'Unknown error',
-    }, { status: 500 })
-  }
-}
-
-// Handle direct API testing (keep existing functionality)
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json()
-    const { username, method, key } = body
-    
-    if (!username) {
-      return NextResponse.json({ error: 'Username required' }, { status: 400 })
-    }
-
-    let result: unknown
-
-    switch (method) {
-      case 'getProfile':
-        result = await basePublicClient.readContract({
-          address: REGISTRY_ADDRESS,
-          abi: REGISTRY_ABI,
-          functionName: 'getProfile',
-          args: [username],
-        })
-        break
-
-      case 'getAddress':
-        result = await basePublicClient.readContract({
-          address: REGISTRY_ADDRESS,
-          abi: REGISTRY_ABI,
-          functionName: 'getAddress',
-          args: [username],
-        })
-        break
-
-      case 'getText':
-        if (!key) {
-          return NextResponse.json({ error: 'Key required' }, { status: 400 })
-        }
-        const textResult = await basePublicClient.readContract({
-          address: REGISTRY_ADDRESS,
-          abi: REGISTRY_ABI,
-          functionName: 'getText',
-          args: [username, key],
-        }) as string
-        
-        // Convert comma-separated to JSON for AI fields
-        let processed: string = textResult
-        if (key.startsWith('ai.') && textResult && !textResult.startsWith('[')) {
-          const items = textResult.split(',').map(item => item.trim())
-          processed = JSON.stringify(items)
-        }
-        
-        result = { raw: textResult, processed }
-        break
-
-      default:
-        return NextResponse.json({ error: 'Invalid method' }, { status: 400 })
-    }
-
-    return NextResponse.json({ 
-      result, 
-      success: true,
-      registry: REGISTRY_ADDRESS,
-      network: 'Base Mainnet',
-      timestamp: new Date().toISOString()
-    })
-
-  } catch (err) {
-    return NextResponse.json({
-      error: 'Query failed',
       details: err instanceof Error ? err.message : 'Unknown error',
     }, { status: 500 })
   }

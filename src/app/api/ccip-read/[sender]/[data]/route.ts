@@ -61,8 +61,8 @@ function namehash(name: string): string {
 async function extractUsernameFromNode(node: string): Promise<string> {
   console.log('🔍 Extracting username from node:', node)
   
-  // Try common usernames first
-  const commonUsernames = ['aaron', 'alice', 'bob', 'test', 'demo', 'charlie', 'diana', 'john', 'jane', 'admin', 'user']
+  // Try common usernames first + any specific test cases
+  const commonUsernames = ['aaron', 'alice', 'bob', 'test', 'demo', 'charlie', 'diana', 'john', 'jane', 'admin', 'user', 'testuser', 'example', 'dev']
   
   for (const username of commonUsernames) {
     const calculatedNode = namehash(`${username}.contx.eth`)
@@ -159,17 +159,49 @@ export async function GET(
       result = '0x' + encodedResult.toString('hex')
       
     } else {
-      return NextResponse.json({ error: `Function not supported: ${selector}` }, { status: 404 })
+      return NextResponse.json({ error: `Function not supported: ${selector}` }, { 
+        status: 404,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type',
+        }
+      })
     }
 
     console.log('✅ CCIP-Read success for:', username)
-    return NextResponse.json({ data: result })
+    return NextResponse.json({ data: result }, {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+      }
+    })
 
   } catch (err) {
     console.error('❌ CCIP-Read error:', err)
     return NextResponse.json({
       error: 'Resolution failed',
       details: err instanceof Error ? err.message : 'Unknown error',
-    }, { status: 500 })
+    }, { 
+      status: 500,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+      }
+    })
   }
+}
+
+// Handle CORS preflight requests
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  })
 }

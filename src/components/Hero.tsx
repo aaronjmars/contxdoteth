@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { usePrivy } from '@privy-io/react-auth'
 import { renderCanvas } from "@/components/ui/canvas"
 import { InteractiveHoverButton } from "@/components/ui/interactive-hover-button";
-import { Plus, Wallet, User } from "lucide-react";
+import { Plus } from "lucide-react";
 
 export function Hero() {
   const router = useRouter()
@@ -29,29 +29,6 @@ export function Hero() {
         <div className="mb-10 mt-4 md:mt-6">
           <div className="px-2">
             <div className="relative mx-auto h-full max-w-7xl border border-primary/20 p-6 [mask-image:radial-gradient(800rem_96rem_at_center,white,transparent)] md:px-12 md:py-20">
-              {/* Top Right Wallet Button */}
-              <div className="absolute top-6 right-6 z-30">
-                {ready && authenticated ? (
-                  <button
-                    onClick={() => router.push('/dashboard')}
-                    className="flex items-center gap-2 px-4 py-2 text-sm bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-full transition-colors"
-                  >
-                    <User className="w-4 h-4 text-primary" />
-                    <span className="text-primary">
-                      {user?.wallet?.address?.slice(0, 6)}...{user?.wallet?.address?.slice(-4)}
-                    </span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={login}
-                    disabled={!ready}
-                    className="flex items-center gap-2 px-4 py-2 text-sm bg-background/50 hover:bg-background/80 border border-primary/20 rounded-full transition-colors disabled:opacity-50"
-                  >
-                    <Wallet className="w-4 h-4 text-primary" />
-                    <span className="text-primary">Connect Wallet</span>
-                  </button>
-                )}
-              </div>
               
               <h1 className="flex select-none flex-col px-3 py-2 text-center text-5xl font-semibold leading-none tracking-tight md:flex-col md:text-8xl lg:flex-row lg:text-8xl">
                 <Plus
@@ -82,7 +59,7 @@ export function Hero() {
 
               <div className="flex justify-center gap-2 mt-8 relative z-20">
                 <InteractiveHoverButton 
-                  text={authenticated ? 'Claim Username' : 'Claim Username Free'}
+                  text={authenticated ? 'Mint' : 'Claim Username'}
                   onClick={handleGetStarted}
                   disabled={!ready}
                   className="text-lg relative z-20"

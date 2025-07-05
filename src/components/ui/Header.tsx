@@ -18,7 +18,7 @@ export default function Header() {
   }
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50">
+    <header className="fixed top-4 left-0 right-0 z-50">
       <div className="w-full px-2 sm:px-4">
         <div className="flex items-center justify-between h-16">
           {/* Left: Animated Logo */}
@@ -29,7 +29,7 @@ export default function Header() {
           {/* Right: Claim Button */}
           <div className="flex-shrink-0">
             <InteractiveHoverButton 
-              text={authenticated ? 'Dashboard' : 'Claim Free'}
+              text={authenticated ? 'Dashboard' : 'Mint'}
               onClick={handleClaim}
               disabled={!ready}
               className="bg-primary text-primary-foreground border-primary text-sm px-6 py-2"

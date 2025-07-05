@@ -1,4 +1,4 @@
-import { createPublicClient, http, Address, keccak256, encodePacked, encodeFunctionData } from 'viem'
+import { createPublicClient, http, Address, keccak256, encodePacked } from 'viem'
 import { mainnet, baseSepolia } from 'viem/chains'
 
 // Base Sepolia Basenames Contract Addresses - OFFICIAL
@@ -38,18 +38,6 @@ export enum BasenameTextRecordKeys {
   Avatar = 'avatar',
 }
 
-// Debug helper to verify contract addresses
-export function debugContractAddresses() {
-  console.log('📋 BASE SEPOLIA BASENAMES ADDRESSES:')
-  console.log('- Registry:', BASE_ENS_ADDRESSES.registry)
-  console.log('- BaseRegistrar:', BASE_ENS_ADDRESSES.baseRegistrar)
-  console.log('- RegistrarController:', BASE_ENS_ADDRESSES.registrarController)
-  console.log('- L2Resolver:', BASENAME_L2_RESOLVER_ADDRESS)
-  console.log('- ReverseRegistrar:', BASE_ENS_ADDRESSES.reverseRegistrar)
-  console.log('- PriceOracle:', BASE_ENS_ADDRESSES.priceOracle)
-  console.log('🔍 Using proper Basenames architecture with RegistrarController')
-  console.log('🔗 Reference: https://docs.base.org/tools/basenames')
-}
 
 // Create public client for Base Sepolia (testnet)
 export const basePublicClient = createPublicClient({
@@ -57,56 +45,8 @@ export const basePublicClient = createPublicClient({
   transport: http(process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://sepolia.base.org'),
 })
 
-/**
- * Convert an chainId to a coinType hex for reverse chain resolution
- */
-export const convertChainIdToCoinType = (chainId: number): string => {
-  // L1 resolvers to addr
-  if (chainId === mainnet.id) {
-    return 'addr'
-  }
 
-  const cointype = (0x80000000 | chainId) >>> 0
-  return cointype.toString(16).toLocaleUpperCase()
-}
 
-/**
- * Convert an address to a reverse node for ENS resolution
- */
-export const convertReverseNodeToBytes = (
-  address: Address,
-  chainId: number
-) => {
-  const addressFormatted = address.toLocaleLowerCase() as Address
-  const addressNode = keccak256(addressFormatted.substring(2) as Address)
-  const chainCoinType = convertChainIdToCoinType(chainId)
-  const baseReverseNode = namehash(
-    `${chainCoinType.toLocaleUpperCase()}.reverse`
-  )
-  const addressReverseNode = keccak256(
-    encodePacked(['bytes32', 'bytes32'], [baseReverseNode, addressNode])
-  )
-  return addressReverseNode
-}
-
-export async function getBasename(address: Address): Promise<Basename | null> {
-  try {
-    const addressReverseNode = convertReverseNodeToBytes(address, baseSepolia.id)
-    const basename = await basePublicClient.readContract({
-      abi: ENS_RESOLVER_ABI,
-      address: BASENAME_L2_RESOLVER_ADDRESS,
-      functionName: 'text', // Use 'text' function to read reverse record
-      args: [addressReverseNode, 'name'],
-    })
-    if (basename) {
-      return basename as Basename
-    }
-    return null
-  } catch (error) {
-    console.error('Error resolving Basename:', error)
-    return null
-  }
-}
 
 // Create public client for Ethereum mainnet (for ENS resolution)
 export const mainnetPublicClient = createPublicClient({
@@ -372,70 +312,7 @@ export function formatBasename(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9-]/g, '')
 }
 
-export function nameToTokenId(name: string): bigint {
-  // Convert name to tokenId for BaseRegistrar ownership checks
-  return BigInt(keccak256(new TextEncoder().encode(name)))
-}
 
-export function packResolverData(
-  nameLabel: string // Just the name without .basetest.eth
-): `0x${string}`[] {
-  // Try multiple namehash calculation methods to find the right one
-  const fullName = `${nameLabel}.basetest.eth`
-  
-  // Method 1: Standard ENS namehash of full name
-  const method1Node = namehash(fullName)
-  
-  // Method 2: Manual calculation (basetest.eth + label)
-  const baseNode = namehash('basetest.eth')
-  const labelHash = keccak256(new TextEncoder().encode(nameLabel))
-  const method2Node = keccak256(encodePacked(['bytes32', 'bytes32'], [baseNode, labelHash]))
-  
-  // Method 3: Just use the RegistrarController's internal logic (might be different)
-  // Some implementations use a different root or calculation
-  
-  console.log('🔍 Namehash calculation debug:')
-  console.log('- Name label:', nameLabel)
-  console.log('- Full name:', fullName)
-  console.log('- Method 1 (standard):', method1Node)
-  console.log('- Method 2 (manual):', method2Node)
-  console.log('- BaseTest node:', baseNode)
-  console.log('- Label hash:', labelHash)
-  console.log('- Match?', method1Node === method2Node)
-  
-  // Use Method 1 (standard ENS namehash) - this should be correct
-  const node = method1Node
-  
-  const data: `0x${string}`[] = []
-  
-  // Start with ONLY text records to debug (skip setAddr for now)
-  console.log('🧪 Testing with TEXT RECORDS ONLY (no setAddr)')
-  
-  // SIMPLIFIED: Add just ONE text record to test namehash
-  const testTextData = encodeFunctionData({
-    abi: ENS_RESOLVER_ABI,
-    functionName: 'setText',
-    args: [node, 'ai.version', '1.0'],
-  })
-  data.push(testTextData)
-  console.log('🧪 Added SINGLE test setText for ai.version with node:', node)
-  
-  // TODO: Add more records after this works
-  // const ensRecords = formatAIContextForENS(aiContext)
-  // Object.entries(ensRecords).forEach(([key, value]) => {
-  //   const textData = encodeFunctionData({
-  //     abi: ENS_RESOLVER_ABI,
-  //     functionName: 'setText',
-  //     args: [node, key, value],
-  //   })
-  //   data.push(textData)
-  //   console.log(`✅ Added setText data for ${key} with node:`, node)
-  // })
-  
-  console.log('📊 Total resolver data items:', data.length)
-  console.log('🎯 All using same node hash:', node)
-  return data
-}
 
 // AI Context schema for ENS text records
 export interface AIContextRecord {
@@ -467,21 +344,6 @@ export function formatAIContextForENS(context: {
   }
 }
 
-export function parseAIContextFromENS(records: Record<string, string>) {
-  try {
-    return {
-      bio: records['ai.bio'] ? JSON.parse(records['ai.bio']) : [],
-      style: records['ai.style'] ? JSON.parse(records['ai.style']) : {},
-      topics: records['ai.topics'] ? JSON.parse(records['ai.topics']) : [],
-      traits: records['ai.traits'] ? JSON.parse(records['ai.traits']) : [],
-      updated: records['ai.updated'] || null,
-      version: records['ai.version'] || '1.0',
-    }
-  } catch (error) {
-    console.error('Error parsing AI context from ENS:', error)
-    return null
-  }
-}
 
 // RegisterRequest type for Base Sepolia
 export interface RegisterRequest {

@@ -2,7 +2,6 @@ import './globals.css'
 import { Inter } from 'next/font/google'
 import { PrivyProvider } from '@/providers/PrivyProvider'
 import StyledComponentsRegistry from '@/lib/registry'
-import '@/lib/suppress-warnings'
 
 const inter = Inter({ subsets: ['latin'] })
 

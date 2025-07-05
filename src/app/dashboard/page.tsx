@@ -1,547 +1,742 @@
 'use client'
 
 import { useState } from 'react'
-import { usePrivy } from '@privy-io/react-auth'
-import ENSMintOrUpdate from '@/components/ENSMintOrUpdate'
-import RegistrationSuccess from '@/components/RegistrationSuccess'
-import BasenamesList from '@/components/BasenamesList'
-import { useENSName } from '@/lib/hooks/useENSName'
-import {
-  Twitter,
-  User,
-  RefreshCw,
-  CheckCircle,
-  AlertCircle,
-  Sparkles,
-  Brain,
-  Edit3,
-  Download,
-  Share2,
-  ArrowLeft,
-  Copy,
-  ExternalLink,
-  Droplets,
-} from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { usePrivy } from '@privy-io/react-auth'
+import { useAccount, usePublicClient, useWalletClient } from 'wagmi'
+import { Address, namehash } from 'viem'
+import { 
+  Plus, 
+  ArrowLeft, 
+  Wallet, 
+  User, 
+  LogOut, 
+  CheckCircle, 
+  XCircle, 
+  Loader2,
+  Search,
+  FileText,
+  ExternalLink 
+} from 'lucide-react'
+import { InteractiveHoverButton } from '@/components/ui/interactive-hover-button'
+import { useENS } from '@/lib/hooks/useENS'
 
-interface AIContext {
-  bio: string[]
-  style: { [key: string]: string[] }
-  topics: string[]
-  traits: string[]
+// Contract ABIs for custom namespace
+const CONTX_REGISTRY_ABI = [
+  {
+    inputs: [
+      { internalType: "string", name: "username", type: "string" },
+      { internalType: "string", name: "name", type: "string" },
+      { internalType: "string", name: "bio", type: "string" }
+    ],
+    name: "register",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function"
+  },
+  {
+    inputs: [
+      { internalType: "string", name: "username", type: "string" },
+      { internalType: "string[]", name: "keys", type: "string[]" }
+    ],
+    name: "getFields",
+    outputs: [{ internalType: "string[]", name: "", type: "string[]" }],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [{ internalType: "string", name: "username", type: "string" }],
+    name: "getFieldNames",
+    outputs: [{ internalType: "string[]", name: "", type: "string[]" }],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [{ internalType: "string", name: "username", type: "string" }],
+    name: "getAddress",
+    outputs: [{ internalType: "address", name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [
+      { internalType: "string", name: "username", type: "string" },
+      { internalType: "string", name: "key", type: "string" }
+    ],
+    name: "getText",
+    outputs: [{ internalType: "string", name: "", type: "string" }],
+    stateMutability: "view",
+    type: "function"
+  },
+] as const
+
+const CONTX_RESOLVER_ABI = [
+  {
+    inputs: [{ internalType: "bytes32", name: "node", type: "bytes32" }],
+    name: "addr",
+    outputs: [{ internalType: "address", name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [
+      { internalType: "bytes32", name: "node", type: "bytes32" },
+      { internalType: "string", name: "key", type: "string" }
+    ],
+    name: "text",
+    outputs: [{ internalType: "string", name: "", type: "string" }],
+    stateMutability: "view",
+    type: "function"
+  },
+] as const
+
+// Contract addresses from environment variables
+const CONTX_REGISTRY_ADDRESS = process.env.NEXT_PUBLIC_BASE_REGISTRY_ADDRESS as Address
+const CONTX_RESOLVER_ADDRESS = process.env.NEXT_PUBLIC_ETH_RESOLVER_ADDRESS as Address
+
+interface TestResult {
+  status: 'pending' | 'success' | 'error'
+  message: string
+  data?: unknown
 }
 
-export default function Dashboard() {
+export default function DashboardNew() {
   const router = useRouter()
-  const { user, linkTwitter, unlinkTwitter } = usePrivy()
-  // Removed unused state variables
-  const [aiContext, setAiContext] = useState<AIContext | null>(null)
-  const [ensName, setEnsName] = useState('')
+  const { ready, authenticated, login, user, logout } = usePrivy()
+  const { isConnected } = useAccount()
+  const publicClient = usePublicClient()
+  const { data: walletClient } = useWalletClient()
+  
+  // Basename registration (existing)
+  const [_username, _setUsername] = useState('')
+  const [registrationComplete, setRegistrationComplete] = useState(false)
+  const [registeredName, setRegisteredName] = useState('')
   const [transactionHash, setTransactionHash] = useState('')
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [registrationStep, setRegistrationStep] = useState<'pending' | 'registering' | 'completed'>('pending')
-  const [copiedAddress, setCopiedAddress] = useState(false)
-  const { getDisplayName } = useENSName(user?.wallet?.address as `0x${string}`)
+  
+  // Custom namespace states
+  const [customUsername, setCustomUsername] = useState('')
+  const [customName, setCustomName] = useState('')
+  const [customBio, setCustomBio] = useState('')
+  const [customRegisterResult, setCustomRegisterResult] = useState<TestResult>({ status: 'pending', message: '' })
+  
+  // Get All Fields states
+  const [fieldsUsername, setFieldsUsername] = useState('')
+  const [fieldsResult, setFieldsResult] = useState<TestResult>({ status: 'pending', message: '' })
+  const [fieldsData, setFieldsData] = useState<{ [key: string]: string }>({})
+  
+  // Ethereum ENS Test states
+  const [ethEnsUsername, setEthEnsUsername] = useState('')
+  const [ethEnsResult, setEthEnsResult] = useState<TestResult>({ status: 'pending', message: '' })
+  
+  // ENS Text Records states
+  const [ensTextUsername, setEnsTextUsername] = useState('')
+  const [ensTextKey, setEnsTextKey] = useState('bio')
+  const [ensTextResult, setEnsTextResult] = useState<TestResult>({ status: 'pending', message: '' })
+  
+  const { registerBasename: _registerBasename } = useENS()
 
-  const twitterAccount = user?.twitter
-  const hasTwitter = !!twitterAccount
+  // Helper functions for test results
+  const createLoadingResult = (message: string): TestResult => ({
+    status: 'pending',
+    message
+  })
 
-  const handleConnectTwitter = async () => {
+  const createSuccessResult = (message: string, data?: unknown): TestResult => ({
+    status: 'success',
+    message,
+    data
+  })
+
+  const createErrorResult = (message: string): TestResult => ({
+    status: 'error',
+    message
+  })
+
+  // Custom namespace register function
+  const handleCustomRegister = async () => {
+    if (!walletClient || !publicClient || !isConnected) {
+      alert('Please connect your wallet first')
+      return
+    }
+
     try {
-      await linkTwitter()
+      setCustomRegisterResult(createLoadingResult('Registering custom username...'))
+
+      const hash = await walletClient.writeContract({
+        address: CONTX_REGISTRY_ADDRESS,
+        abi: CONTX_REGISTRY_ABI,
+        functionName: 'register',
+        args: [customUsername, customName, customBio]
+      })
+
+      setCustomRegisterResult(createLoadingResult('Transaction sent, waiting for confirmation...'))
+
+      const receipt = await publicClient.waitForTransactionReceipt({ hash })
+
+      if (receipt.status === 'success') {
+        setCustomRegisterResult(createSuccessResult(
+          `Successfully registered ${customUsername}.contx.eth!`,
+          { hash, receipt }
+        ))
+      } else {
+        setCustomRegisterResult(createErrorResult('Transaction failed'))
+      }
     } catch (error) {
-      console.error('Failed to connect Twitter:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Registration failed'
+      setCustomRegisterResult(createErrorResult(errorMessage))
     }
   }
 
-  const handleDisconnectTwitter = async () => {
+  // Get all fields function
+  const handleGetFields = async () => {
+    if (!publicClient) {
+      alert('Please connect your wallet first')
+      return
+    }
+
     try {
-      await unlinkTwitter(twitterAccount?.subject || '')
+      setFieldsResult(createLoadingResult('Fetching fields...'))
+
+      // Get standard field names
+      const fieldNames = await publicClient.readContract({
+        address: CONTX_REGISTRY_ADDRESS,
+        abi: CONTX_REGISTRY_ABI,
+        functionName: 'getFieldNames',
+        args: [fieldsUsername]
+      })
+
+      // Get values for all fields
+      const fieldValues = await publicClient.readContract({
+        address: CONTX_REGISTRY_ADDRESS,
+        abi: CONTX_REGISTRY_ABI,
+        functionName: 'getFields',
+        args: [fieldsUsername, fieldNames]
+      })
+
+      const fieldsData: { [key: string]: string } = {}
+      fieldNames.forEach((name, index) => {
+        fieldsData[name] = fieldValues[index]
+      })
+
+      setFieldsData(fieldsData)
+      setFieldsResult(createSuccessResult(
+        `Retrieved ${fieldNames.length} fields for ${fieldsUsername}`,
+        fieldsData
+      ))
     } catch (error) {
-      console.error('Failed to disconnect Twitter:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Fields retrieval failed'
+      setFieldsResult(createErrorResult(errorMessage))
     }
   }
 
-  const handleGenerateAIContext = async () => {
-    if (!hasTwitter) return
+  // Ethereum ENS Test function
+  const handleEthEnsTest = async () => {
+    try {
+      setEthEnsResult(createLoadingResult('Testing ENS resolution on Ethereum mainnet...'))
+
+      // Create Ethereum mainnet client
+      const { createPublicClient, http } = await import('viem')
+      const { mainnet } = await import('viem/chains')
+      
+      const ethereumClient = createPublicClient({
+        chain: mainnet,
+        transport: http('https://eth.llamarpc.com'),
+      })
+
+      // Create the ENS node for username.contx.eth
+      const node = namehash(`${ethEnsUsername}.contx.eth`)
+
+      try {
+        // Try to resolve via your ContxResolver on Ethereum
+        const resolvedAddress = await ethereumClient.readContract({
+          address: CONTX_RESOLVER_ADDRESS,
+          abi: CONTX_RESOLVER_ABI,
+          functionName: 'addr',
+          args: [node]
+        })
+
+        setEthEnsResult(createSuccessResult(
+          `✅ Ethereum ENS resolution successful: ${ethEnsUsername}.contx.eth → ${resolvedAddress}`,
+          { 
+            address: resolvedAddress, 
+            node: node,
+            network: 'Ethereum Mainnet',
+            resolver: CONTX_RESOLVER_ADDRESS
+          }
+        ))
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        if (errorMessage.includes('OffchainLookup') || errorMessage.includes('CCIP read')) {
+          setEthEnsResult(createSuccessResult(
+            `🔄 CCIP-Read triggered on Ethereum! This means your resolver is working correctly.`,
+            { 
+              status: 'ccip-triggered',
+              error: errorMessage,
+              network: 'Ethereum Mainnet',
+              resolver: CONTX_RESOLVER_ADDRESS,
+              note: 'The resolver is correctly throwing OffchainLookup to trigger CCIP-Read'
+            }
+          ))
+        } else {
+          setEthEnsResult(createErrorResult(
+            `Ethereum ENS resolution failed: ${errorMessage}`
+          ))
+        }
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Ethereum ENS test failed'
+      setEthEnsResult(createErrorResult(errorMessage))
+    }
+  }
+
+  // ENS Text Record Resolution function
+  const handleEnsTextTest = async () => {
+    try {
+      setEnsTextResult(createLoadingResult('Testing ENS text record resolution...'))
+
+      // Create Ethereum mainnet client
+      const { createPublicClient, http } = await import('viem')
+      const { mainnet } = await import('viem/chains')
+      
+      const ethereumClient = createPublicClient({
+        chain: mainnet,
+        transport: http('https://eth.llamarpc.com'),
+      })
+
+      // Create the ENS node for username.contx.eth
+      const node = namehash(`${ensTextUsername}.contx.eth`)
+
+      try {
+        // Try to resolve text record via your ContxResolver on Ethereum
+        const textValue = await ethereumClient.readContract({
+          address: CONTX_RESOLVER_ADDRESS,
+          abi: CONTX_RESOLVER_ABI,
+          functionName: 'text',
+          args: [node, ensTextKey]
+        })
+
+        setEnsTextResult(createSuccessResult(
+          `✅ Text record resolved: ${ensTextUsername}.contx.eth["${ensTextKey}"] = "${textValue}"`,
+          { 
+            textValue, 
+            node,
+            key: ensTextKey,
+            network: 'Ethereum Mainnet',
+            resolver: CONTX_RESOLVER_ADDRESS
+          }
+        ))
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        if (errorMessage.includes('OffchainLookup') || errorMessage.includes('CCIP read')) {
+          setEnsTextResult(createSuccessResult(
+            `🔄 CCIP-Read triggered for text records! This means your text resolution is working.`,
+            { 
+              status: 'ccip-triggered',
+              error: errorMessage,
+              network: 'Ethereum Mainnet',
+              resolver: CONTX_RESOLVER_ADDRESS,
+              key: ensTextKey,
+              note: 'The resolver is correctly throwing OffchainLookup for text record resolution'
+            }
+          ))
+        } else {
+          setEnsTextResult(createErrorResult(
+            `Text record resolution failed: ${errorMessage}`
+          ))
+        }
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'ENS text test failed'
+      setEnsTextResult(createErrorResult(errorMessage))
+    }
+  }
+
+  // Result component
+  const ResultDisplay = ({ result }: { result: TestResult }) => {
+    const Icon = result.status === 'pending' ? Loader2 : result.status === 'success' ? CheckCircle : XCircle
+    const colorClass = result.status === 'pending' ? 'text-blue-500' : result.status === 'success' ? 'text-green-500' : 'text-red-500'
     
-    setIsGenerating(true)
-    try {
-      // First, fetch Twitter profile data
-      const profileResponse = await fetch('/api/twitter/profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          twitterAccessToken: 'mock-token', // Privy doesn't expose access tokens directly
-          twitterUsername: twitterAccount?.username,
-        }),
-      })
-
-      if (!profileResponse.ok) {
-        throw new Error('Failed to fetch Twitter profile')
-      }
-
-      const profileData = await profileResponse.json()
-
-      // Then, generate AI context
-      const contextResponse = await fetch('/api/ai/generate-context', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          profile: profileData.profile,
-          tweets: profileData.tweets,
-        }),
-      })
-
-      if (!contextResponse.ok) {
-        throw new Error('Failed to generate AI context')
-      }
-
-      const contextData = await contextResponse.json()
-      setAiContext(contextData.aiContext)
-    } catch (error) {
-      console.error('Error generating AI context:', error)
-    } finally {
-      setIsGenerating(false)
-    }
+    return (
+      <div className={`flex items-center gap-2 mt-2 ${colorClass}`}>
+        <Icon className={`w-4 h-4 ${result.status === 'pending' ? 'animate-spin' : ''}`} />
+        <span className="text-sm">{result.message}</span>
+      </div>
+    )
   }
 
-  const handleRegistrationSuccess = (baseName: string, txHash: string) => {
-    setEnsName(baseName)
-    setTransactionHash(txHash)
-    setRegistrationStep('completed')
-  }
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text)
-  }
-
-  const copyWalletAddress = () => {
-    if (user?.wallet?.address) {
-      navigator.clipboard.writeText(user.wallet.address)
-      setCopiedAddress(true)
-      setTimeout(() => setCopiedAddress(false), 2000)
-    }
-  }
-
-  const displayName = getDisplayName(user?.wallet?.address)
-
-  return (
-    <div className="flex-1 bg-white min-h-screen">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-4 mb-4">
-            <button
-              onClick={() => router.push('/')}
-              className="flex items-center gap-2 text-muted hover:text-[#1d1d1f] transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              Back to Home
-            </button>
-          </div>
-          <h1 className="text-4xl font-semibold text-[#1d1d1f] mb-2">Dashboard</h1>
-          <p className="text-xl text-muted">Manage your AI-enhanced ENS profile</p>
-        </div>
-
-        {/* Status Cards */}
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
-          <div className="card">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center">
-                  <User className="w-6 h-6 text-primary" />
+  if (!ready) {
+    return (
+      <section className="relative overflow-hidden min-h-screen">
+        <div className="animation-delay-8 animate-fadeIn mt-20 flex flex-col items-center justify-center px-4 text-center md:mt-20">
+          <div className="mb-10 mt-4 md:mt-6">
+            <div className="px-2">
+              <div className="relative mx-auto h-full max-w-7xl border border-primary/20 p-6 [mask-image:radial-gradient(800rem_96rem_at_center,white,transparent)] md:px-12 md:py-20">
+                <div className="text-center">
+                  <h1 className="text-2xl font-semibold mb-4">Loading...</h1>
+                  <p className="text-muted-foreground">Initializing connection</p>
                 </div>
-                <div className="ml-4">
-                  <h3 className="text-sm font-medium text-muted">Wallet</h3>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  if (!authenticated) {
+    return (
+      <section className="relative overflow-hidden min-h-screen">
+        <div className="animation-delay-8 animate-fadeIn mt-20 flex flex-col items-center justify-center px-4 text-center md:mt-20">
+          <div className="mb-10 mt-4 md:mt-6">
+            <div className="px-2">
+              <div className="relative mx-auto h-full max-w-7xl border border-primary/20 p-6 [mask-image:radial-gradient(800rem_96rem_at_center,white,transparent)] md:px-12 md:py-20">
+                <button
+                  onClick={() => router.push('/')}
+                  className="absolute top-6 left-6 inline-flex items-center gap-2 text-primary hover:text-primary/80 transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Home
+                </button>
+                
+                {/* Top Right Wallet Button */}
+                <div className="absolute top-6 right-6 z-30">
+                  <button
+                    onClick={login}
+                    disabled={!ready}
+                    className="flex items-center gap-2 px-4 py-2 text-sm bg-background/50 hover:bg-background/80 border border-primary/20 rounded-full transition-colors disabled:opacity-50"
+                  >
+                    <Wallet className="w-4 h-4 text-primary" />
+                    <span className="text-primary">Connect Wallet</span>
+                  </button>
+                </div>
+                
+                <h1 
+                  onClick={() => router.push('/')}
+                  className="flex select-none flex-col px-3 py-2 text-center text-5xl font-semibold leading-none tracking-tight md:flex-col md:text-8xl lg:flex-row lg:text-8xl cursor-pointer hover:opacity-80 transition-opacity"
+                >
+                  <Plus
+                    strokeWidth={4}
+                    className="text-primary absolute -left-5 -top-5 h-10 w-10"
+                  />
+                  <Plus
+                    strokeWidth={4}
+                    className="text-primary absolute -bottom-5 -left-5 h-10 w-10"
+                  />
+                  <Plus
+                    strokeWidth={4}
+                    className="text-primary absolute -right-5 -top-5 h-10 w-10"
+                  />
+                  <Plus
+                    strokeWidth={4}
+                    className="text-primary absolute -bottom-5 -right-5 h-10 w-10"
+                  />
+                  Connect Wallet
+                </h1>
+                
+                <div className="flex justify-center gap-2 mt-8 relative z-20">
+                  <InteractiveHoverButton 
+                    text="Connect Wallet"
+                    onClick={login}
+                    className="text-lg relative z-20"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  if (registrationComplete) {
+    return (
+      <section className="relative overflow-hidden min-h-screen">
+        <div className="animation-delay-8 animate-fadeIn mt-20 flex flex-col items-center justify-center px-4 text-center md:mt-20">
+          <div className="mb-10 mt-4 md:mt-6">
+            <div className="px-2">
+              <div className="relative mx-auto h-full max-w-7xl border border-primary/20 p-6 [mask-image:radial-gradient(800rem_96rem_at_center,white,transparent)] md:px-12 md:py-20">
+                <button
+                  onClick={() => router.push('/')}
+                  className="absolute top-6 left-6 inline-flex items-center gap-2 text-primary hover:text-primary/80 transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Home
+                </button>
+                
+                {/* Top Right Wallet Button */}
+                <div className="absolute top-6 right-6 z-30">
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={copyWalletAddress}
-                      className="text-lg font-semibold text-[#1d1d1f] hover:text-primary transition-colors cursor-pointer"
-                      title={user?.wallet?.address}
+                      className="flex items-center gap-2 px-4 py-2 text-sm bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-full transition-colors"
                     >
-                      {displayName}
+                      <User className="w-4 h-4 text-primary" />
+                      <span className="text-primary">
+                        {user?.wallet?.address?.slice(0, 6)}...{user?.wallet?.address?.slice(-4)}
+                      </span>
                     </button>
-                    {user?.wallet?.address && (
-                      <button
-                        onClick={copyWalletAddress}
-                        className="p-1 hover:bg-secondary rounded transition-colors"
-                        title={copiedAddress ? "Copied!" : "Copy wallet address"}
-                      >
-                        {copiedAddress ? (
-                          <CheckCircle className="w-4 h-4 text-success" />
-                        ) : (
-                          <Copy className="w-4 h-4 text-muted hover:text-[#1d1d1f]" />
-                        )}
-                      </button>
-                    )}
+                    <button
+                      onClick={logout}
+                      className="flex items-center gap-1 px-3 py-2 text-xs bg-background/50 hover:bg-background/80 border border-primary/20 rounded-full transition-colors"
+                    >
+                      <LogOut className="w-3 h-3 text-muted-foreground" />
+                    </button>
+                  </div>
+                </div>
+                
+                <h1 
+                  onClick={() => router.push('/')}
+                  className="flex select-none flex-col px-3 py-2 text-center text-5xl font-semibold leading-none tracking-tight md:flex-col md:text-8xl lg:flex-row lg:text-8xl cursor-pointer hover:opacity-80 transition-opacity"
+                >
+                  <Plus
+                    strokeWidth={4}
+                    className="text-primary absolute -left-5 -top-5 h-10 w-10"
+                  />
+                  <Plus
+                    strokeWidth={4}
+                    className="text-primary absolute -bottom-5 -left-5 h-10 w-10"
+                  />
+                  <Plus
+                    strokeWidth={4}
+                    className="text-primary absolute -right-5 -top-5 h-10 w-10"
+                  />
+                  <Plus
+                    strokeWidth={4}
+                    className="text-primary absolute -bottom-5 -right-5 h-10 w-10"
+                  />
+                  Success!
+                </h1>
+                
+                <div className="mt-8 text-center">
+                  <p className="text-xl mb-4">🎉 Your basename has been registered!</p>
+                  <p className="text-lg font-semibold mb-2">{registeredName}</p>
+                  <a 
+                    href={`https://sepolia.basescan.org/tx/${transactionHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:text-primary/80 text-sm"
+                  >
+                    View transaction →
+                  </a>
+                  
+                  <div className="flex justify-center gap-2 mt-8">
+                    <InteractiveHoverButton 
+                      text="Register Another"
+                      onClick={() => {
+                        setRegistrationComplete(false)
+                        _setUsername('')
+                        setRegisteredName('')
+                        setTransactionHash('')
+                      }}
+                      className="text-sm px-6 py-3"
+                    />
                   </div>
                 </div>
               </div>
-              <CheckCircle className="w-5 h-5 text-success" />
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
-                  hasTwitter ? 'bg-primary/10' : 'bg-border'
-                }`}>
-                  <Twitter className={`w-6 h-6 ${hasTwitter ? 'text-primary' : 'text-muted'}`} />
-                </div>
-                <div className="ml-4">
-                  <h3 className="text-sm font-medium text-muted">X Account</h3>
-                  <p className="text-lg font-semibold text-[#1d1d1f]">
-                    {hasTwitter ? `@${twitterAccount?.username}` : 'Not connected'}
-                  </p>
-                </div>
-              </div>
-              {hasTwitter ? (
-                <CheckCircle className="w-5 h-5 text-success" />
-              ) : (
-                <AlertCircle className="w-5 h-5 text-warning" />
-              )}
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
-                  aiContext ? 'bg-success/10' : 'bg-border'
-                }`}>
-                  <Brain className={`w-6 h-6 ${aiContext ? 'text-success' : 'text-muted'}`} />
-                </div>
-                <div className="ml-4">
-                  <h3 className="text-sm font-medium text-muted">AI Context</h3>
-                  <p className="text-lg font-semibold text-[#1d1d1f]">
-                    {aiContext ? 'Generated' : 'Not generated'}
-                  </p>
-                </div>
-              </div>
-              {aiContext ? (
-                <CheckCircle className="w-5 h-5 text-success" />
-              ) : (
-                <AlertCircle className="w-5 h-5 text-warning" />
-              )}
             </div>
           </div>
         </div>
+      </section>
+    )
+  }
 
-        {/* Main Content */}
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* Left Column - Main Actions */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Getting Started */}
-            {(!hasTwitter || !aiContext) && (
-              <div className="card">
-                <div className="flex items-center mb-4">
-                  <Sparkles className="w-5 h-5 text-primary mr-2" />
-                  <h2 className="text-xl font-semibold">Getting Started</h2>
-                </div>
-                <p className="text-muted mb-6">
-                  Create your AI-enhanced ENS profile in just a few steps
-                </p>
-                
-                <div className="space-y-4">
-                  {/* Step 1: Connect Twitter */}
-                  <div className="flex items-start gap-4">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                      hasTwitter ? 'bg-success text-white' : 'bg-primary text-white'
-                    }`}>
-                      {hasTwitter ? <CheckCircle className="w-4 h-4" /> : '1'}
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold mb-1">Connect your X account</h3>
-                      <p className="text-sm text-muted mb-3">
-                        We will analyze your profile and recent tweets to understand your style
-                      </p>
-                      {!hasTwitter ? (
-                        <button
-                          onClick={handleConnectTwitter}
-                          className="btn-primary"
-                        >
-                          <Twitter className="w-4 h-4 mr-2" />
-                          Connect X Account
-                        </button>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-success">✓ Connected as @{twitterAccount?.username}</span>
-                          <button
-                            onClick={handleDisconnectTwitter}
-                            className="text-sm text-muted hover:text-error"
-                          >
-                            Disconnect
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Step 2: Generate AI Context */}
-                  <div className="flex items-start gap-4">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                      aiContext ? 'bg-success text-white' : hasTwitter ? 'bg-primary text-white' : 'bg-border text-muted'
-                    }`}>
-                      {aiContext ? <CheckCircle className="w-4 h-4" /> : '2'}
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold mb-1">Generate AI context</h3>
-                      <p className="text-sm text-muted mb-3">
-                        Our AI will create personalized context from your X data
-                      </p>
-                      {hasTwitter && !aiContext ? (
-                        <button
-                          onClick={handleGenerateAIContext}
-                          disabled={isGenerating}
-                          className="btn-primary"
-                        >
-                          {isGenerating ? (
-                            <>
-                              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                              Generating...
-                            </>
-                          ) : (
-                            <>
-                              <Brain className="w-4 h-4 mr-2" />
-                              Generate AI Context
-                            </>
-                          )}
-                        </button>
-                      ) : aiContext ? (
-                        <span className="text-sm text-success">✓ AI context generated</span>
-                      ) : (
-                        <span className="text-sm text-muted">Connect X account first</span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Step 3: Deploy to ENS */}
-                  <div className="flex items-start gap-4">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                      ensName ? 'bg-success text-white' : aiContext ? 'bg-primary text-white' : 'bg-border text-muted'
-                    }`}>
-                      {ensName ? <CheckCircle className="w-4 h-4" /> : '3'}
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold mb-1">Deploy to ENS</h3>
-                      <p className="text-sm text-muted mb-3">
-                        Create your .basetest.eth domain with AI context
-                      </p>
-                      {ensName ? (
-                        <span className="text-sm text-success">✓ Deployed to {ensName}</span>
-                      ) : (
-                        <span className="text-sm text-muted">Review and confirm AI context below</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* ENS Registration */}
-            {registrationStep === 'registering' && aiContext && (
-              <ENSMintOrUpdate
-                aiContext={aiContext}
-                onSuccess={handleRegistrationSuccess}
-                onCancel={() => setRegistrationStep('pending')}
-              />
-            )}
-
-            {/* Registration Success */}
-            {registrationStep === 'completed' && ensName && transactionHash && aiContext && (
-              <RegistrationSuccess
-                baseName={ensName}
-                transactionHash={transactionHash}
-                aiContext={aiContext}
-              />
-            )}
-
-            {/* AI Context Preview */}
-            {aiContext && registrationStep === 'pending' && (
-              <div className="card">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold">AI Context Preview</h2>
-                  <div className="flex gap-2">
-                    <button className="btn-secondary text-sm">
-                      <Edit3 className="w-4 h-4 mr-2" />
-                      Edit
-                    </button>
-                    <button 
-                      onClick={() => setRegistrationStep('registering')}
-                      className="btn-primary text-sm"
-                    >
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Confirm & Continue
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="space-y-4">
-                  {aiContext.bio && aiContext.bio.length > 0 && (
-                    <div>
-                      <h3 className="font-semibold mb-2">Bio Lines</h3>
-                      <div className="space-y-1">
-                        {aiContext.bio.map((line, index) => (
-                          <p key={index} className="text-sm text-muted bg-secondary p-2 rounded-lg">
-                            {line}
-                          </p>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {aiContext.topics && aiContext.topics.length > 0 && (
-                    <div>
-                      <h3 className="font-semibold mb-2">Topics</h3>
-                      <div className="flex flex-wrap gap-2">
-                        {aiContext.topics.map((topic, index) => (
-                          <span key={index} className="badge-primary">
-                            {topic}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {aiContext.traits && aiContext.traits.length > 0 && (
-                    <div>
-                      <h3 className="font-semibold mb-2">Personality Traits</h3>
-                      <div className="flex flex-wrap gap-2">
-                        {aiContext.traits.map((trait, index) => (
-                          <span key={index} className="badge">
-                            {trait}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {aiContext.style && (
-                    <div>
-                      <h3 className="font-semibold mb-2">Communication Style</h3>
-                      <div className="flex flex-wrap gap-2">
-                        {aiContext.style.all?.map((style, index) => (
-                          <span key={index} className="badge">
-                            {style}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
+  return (
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-6xl mx-auto px-4">
+        {/* Top Navigation */}
+        <div className="flex items-center justify-between mb-8">
+          <button
+            onClick={() => router.push('/')}
+            className="inline-flex items-center gap-2 text-primary hover:text-primary/80 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Home
+          </button>
+          
+          <div className="flex items-center gap-2">
+            {!authenticated ? (
+              <button
+                onClick={login}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+              >
+                <Wallet className="w-4 h-4" />
+                Connect Wallet
+              </button>
+            ) : (
+              <>
+                <button className="flex items-center gap-2 px-4 py-2 text-sm bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-full transition-colors">
+                  <User className="w-4 h-4 text-primary" />
+                  <span className="text-primary">
+                    {user?.wallet?.address?.slice(0, 6)}...{user?.wallet?.address?.slice(-4)}
+                  </span>
+                </button>
+                <button
+                  onClick={logout}
+                  className="flex items-center gap-1 px-3 py-2 text-xs bg-background/50 hover:bg-background/80 border border-primary/20 rounded-full transition-colors"
+                >
+                  <LogOut className="w-3 h-3 text-muted-foreground" />
+                </button>
+              </>
             )}
           </div>
+        </div>
 
-          {/* Right Column - Sidebar */}
-          <div className="space-y-6">
-            {/* Existing Basenames */}
-            <BasenamesList />
+        {/* Error States */}
+        {!CONTX_REGISTRY_ADDRESS && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 max-w-4xl mx-auto">
+            <div className="flex items-center gap-2">
+              <ExternalLink className="w-5 h-5 text-red-500" />
+              <p className="text-sm text-red-800">
+                <strong>Contract addresses missing:</strong> Please set NEXT_PUBLIC_BASE_REGISTRY_ADDRESS and NEXT_PUBLIC_ETH_RESOLVER_ADDRESS
+              </p>
+            </div>
+          </div>
+        )}
 
-            {/* Quick Actions */}
-            <div className="card">
-              <h3 className="font-semibold mb-4">Quick Actions</h3>
-              <div className="space-y-2">
-                <a
-                  href="https://docs.base.org/docs/tools/network-faucets/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full text-left p-3 rounded-xl hover:bg-secondary transition-colors flex items-center"
-                >
-                  <Droplets className="w-4 h-4 mr-3 text-primary" />
-                  <div className="flex-1">
-                    <div className="text-sm font-medium">Get Testnet ETH</div>
-                    <div className="text-xs text-muted">Base Sepolia faucet</div>
-                  </div>
-                  <ExternalLink className="w-3 h-3 text-muted" />
-                </a>
-                
-                
-                <button className="w-full text-left p-3 rounded-xl hover:bg-secondary transition-colors">
-                  <div className="flex items-center">
-                    <RefreshCw className="w-4 h-4 mr-3 text-primary" />
-                    <div>
-                      <div className="text-sm font-medium">Update Context</div>
-                      <div className="text-xs text-muted">Refresh from X</div>
+        {/* 4-Function Grid */}
+        <div className="grid grid-cols-2 gap-4 max-w-2xl mx-auto">
+          {/* Custom Register Username */}
+          <div className="bg-white rounded-lg shadow-md p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <User className="w-4 h-4 text-green-500" />
+              <h3 className="text-sm font-semibold">Register Username</h3>
+            </div>
+            <div className="space-y-3">
+              <input
+                type="text"
+                placeholder="Username (e.g., alice)"
+                value={customUsername}
+                onChange={(e) => setCustomUsername(e.target.value)}
+                className="w-full p-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              />
+              <input
+                type="text"
+                placeholder="Display name"
+                value={customName}
+                onChange={(e) => setCustomName(e.target.value)}
+                className="w-full p-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              />
+              <textarea
+                placeholder="Bio"
+                value={customBio}
+                onChange={(e) => setCustomBio(e.target.value)}
+                className="w-full p-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                rows={2}
+              />
+              <button
+                onClick={handleCustomRegister}
+                disabled={!customUsername || !customName || !customBio || !authenticated}
+                className="w-full bg-green-500 text-white py-2 text-sm rounded hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+              >
+                Register {customUsername && `${customUsername}.contx.eth`}
+              </button>
+              <ResultDisplay result={customRegisterResult} />
+            </div>
+          </div>
+
+          {/* Get All Fields */}
+          <div className="bg-white rounded-lg shadow-md p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <FileText className="w-4 h-4 text-purple-500" />
+              <h3 className="text-sm font-semibold">Get All Fields</h3>
+            </div>
+            <div className="space-y-3">
+              <input
+                type="text"
+                placeholder="Username"
+                value={fieldsUsername}
+                onChange={(e) => setFieldsUsername(e.target.value)}
+                className="w-full p-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+              />
+              <button
+                onClick={handleGetFields}
+                disabled={!fieldsUsername || !authenticated}
+                className="w-full bg-purple-500 text-white py-2 text-sm rounded hover:bg-purple-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+              >
+                Get All Fields
+              </button>
+              <ResultDisplay result={fieldsResult} />
+              {Object.keys(fieldsData).length > 0 && (
+                <div className="p-2 bg-gray-50 rounded text-xs max-h-32 overflow-y-auto">
+                  {Object.entries(fieldsData).map(([key, value]) => (
+                    <div key={key} className="flex justify-between py-1 border-b border-gray-200 last:border-b-0">
+                      <span className="font-medium text-gray-700">{key}:</span>
+                      <span className="text-gray-600 truncate max-w-20">{value || '(empty)'}</span>
                     </div>
-                  </div>
-                </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
 
-                <button className="w-full text-left p-3 rounded-xl hover:bg-secondary transition-colors">
-                  <div className="flex items-center">
-                    <Brain className="w-4 h-4 mr-3 text-primary" />
-                    <div>
-                      <div className="text-sm font-medium">Test AI Chat</div>
-                      <div className="text-xs text-muted">Try with Claude</div>
-                    </div>
-                  </div>
-                </button>
-
-                <button className="w-full text-left p-3 rounded-xl hover:bg-secondary transition-colors">
-                  <div className="flex items-center">
-                    <Share2 className="w-4 h-4 mr-3 text-primary" />
-                    <div>
-                      <div className="text-sm font-medium">Share Profile</div>
-                      <div className="text-xs text-muted">Get link</div>
-                    </div>
-                  </div>
-                </button>
-
-                <button className="w-full text-left p-3 rounded-xl hover:bg-secondary transition-colors">
-                  <div className="flex items-center">
-                    <Download className="w-4 h-4 mr-3 text-primary" />
-                    <div>
-                      <div className="text-sm font-medium">Export Data</div>
-                      <div className="text-xs text-muted">Download JSON</div>
-                    </div>
-                  </div>
-                </button>
-
+          {/* Ethereum ENS Test */}
+          <div className="bg-white rounded-lg shadow-md p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <ExternalLink className="w-4 h-4 text-orange-500" />
+              <h3 className="text-sm font-semibold">Ethereum ENS Test</h3>
+            </div>
+            <div className="space-y-3">
+              <input
+                type="text"
+                placeholder="Username to test on Ethereum"
+                value={ethEnsUsername}
+                onChange={(e) => setEthEnsUsername(e.target.value)}
+                className="w-full p-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              />
+              <button
+                onClick={handleEthEnsTest}
+                disabled={!ethEnsUsername}
+                className="w-full bg-orange-500 text-white py-2 text-sm rounded hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+              >
+                Test on Ethereum Mainnet
+              </button>
+              <ResultDisplay result={ethEnsResult} />
+              <div className="text-xs text-gray-500">
+                <p>Network: Ethereum Mainnet</p>
               </div>
             </div>
+          </div>
 
-            {/* Profile Stats */}
-            <div className="card">
-              <h3 className="font-semibold mb-4">Profile Stats</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted">Context Fields</span>
-                  <span className="text-sm font-medium">
-                    {aiContext ? Object.keys(aiContext).length : 0}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted">Last Updated</span>
-                  <span className="text-sm font-medium">
-                    {aiContext ? 'Just now' : 'Never'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted">AI Interactions</span>
-                  <span className="text-sm font-medium">0</span>
-                </div>
+          {/* ENS Text Records */}
+          <div className="bg-white rounded-lg shadow-md p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Search className="w-4 h-4 text-teal-500" />
+              <h3 className="text-sm font-semibold">ENS Text Records</h3>
+            </div>
+            <div className="space-y-3">
+              <input
+                type="text"
+                placeholder="Username for text record test"
+                value={ensTextUsername}
+                onChange={(e) => setEnsTextUsername(e.target.value)}
+                className="w-full p-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+              />
+              <select
+                value={ensTextKey}
+                onChange={(e) => setEnsTextKey(e.target.value)}
+                className="w-full p-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+              >
+                <option value="bio">bio</option>
+                <option value="name">name</option>
+                <option value="avatar">avatar</option>
+                <option value="description">description</option>
+                <option value="ai.bio">ai.bio</option>
+                <option value="ai.topics">ai.topics</option>
+                <option value="ai.style">ai.style</option>
+                <option value="ai.traits">ai.traits</option>
+              </select>
+              <button
+                onClick={handleEnsTextTest}
+                disabled={!ensTextUsername || !ensTextKey}
+                className="w-full bg-teal-500 text-white py-2 text-sm rounded hover:bg-teal-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+              >
+                Test Text Record Resolution
+              </button>
+              <ResultDisplay result={ensTextResult} />
+              <div className="text-xs text-gray-500">
+                <p>Tests text record resolution via CCIP-Read</p>
               </div>
             </div>
-
-            {/* Raw JSON Preview */}
-            {aiContext && (
-              <div className="card">
-                <h3 className="font-semibold mb-4">Raw JSON</h3>
-                <div className="bg-secondary p-3 rounded-lg">
-                  <pre className="text-xs text-muted font-mono overflow-x-auto">
-                    {JSON.stringify(aiContext, null, 2)}
-                  </pre>
-                </div>
-                <button
-                  onClick={() => copyToClipboard(JSON.stringify(aiContext, null, 2))}
-                  className="mt-3 text-xs text-primary hover:text-primary-hover"
-                >
-                  Copy to clipboard
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </div>

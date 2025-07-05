@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createPublicClient, http, Address, decodeAbiParameters } from 'viem'
+import { createPublicClient, http, Address, decodeAbiParameters, fallback } from 'viem'
 import { base } from 'viem/chains' // Base mainnet
 
 const CONTX_REGISTRY_ADDRESS = process.env.NEXT_PUBLIC_BASE_REGISTRY_ADDRESS as Address
 
 const basePublicClient = createPublicClient({
   chain: base,
-  transport: http(process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org'),
+  transport: fallback([
+    http('https://base.llamarpc.com'),
+    http('https://mainnet.base.org'),
+    http('https://base.gateway.tenderly.co'),
+    http('https://base-mainnet.g.alchemy.com/v2/demo'),
+  ]),
 })
 
 const REGISTRY_ABI = [

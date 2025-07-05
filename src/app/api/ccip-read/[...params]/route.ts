@@ -1,4 +1,4 @@
-// src/app/api/ccip-read/[...params]/route.ts - Correct Next.js Types
+// src/app/api/ccip-read/[...params]/route.ts - WORKING VERSION
 import { NextRequest, NextResponse } from "next/server";
 import {
   createPublicClient,
@@ -74,8 +74,6 @@ function namehash(name: string): string {
 }
 
 async function extractUsernameFromNode(node: string): Promise<string> {
-  console.log("🔍 Extracting username for node:", node);
-
   const commonUsernames = [
     "alice",
     "bob",
@@ -114,8 +112,6 @@ async function extractUsernameFromNode(node: string): Promise<string> {
   for (const username of commonUsernames) {
     const calculatedNode = namehash(`${username}.contx.eth`);
     if (calculatedNode.toLowerCase() === node.toLowerCase()) {
-      console.log("✅ Found username:", username);
-
       try {
         const profile = (await basePublicClient.readContract({
           address: REGISTRY_ADDRESS,
@@ -128,7 +124,6 @@ async function extractUsernameFromNode(node: string): Promise<string> {
           return username;
         }
       } catch {
-        console.log("❌ Username not registered:", username);
         continue;
       }
     }
@@ -137,18 +132,11 @@ async function extractUsernameFromNode(node: string): Promise<string> {
   throw new Error(`Username not found for node: ${node}`);
 }
 
-type RouteContext = {
-  params: {
-    params: string[];
-  };
-};
-
-export async function GET(request: NextRequest, context: RouteContext) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function GET(request: NextRequest, context: any) {
   try {
-    console.log("🌉 CCIP-Read Gateway Request");
-
-    const { params } = context.params;
-    const [sender, data] = params || [];
+    const params = context.params?.params || [];
+    const [sender, data] = params;
 
     if (!sender || !data) {
       return NextResponse.json(
@@ -174,10 +162,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const node = "0x" + decodedBytes.slice(0, 32).toString("hex");
     const selector = "0x" + decodedBytes.slice(32, 36).toString("hex");
 
-    console.log("📊 Decoded:", { node, selector });
-
     const username = await extractUsernameFromNode(node);
-    console.log("👤 Username:", username);
 
     let result: string;
 
@@ -247,7 +232,6 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ data: result });
   } catch (err) {
-    console.error("❌ CCIP-Read error:", err);
     return NextResponse.json(
       {
         error: "Resolution failed",
@@ -308,7 +292,6 @@ export async function POST(request: NextRequest) {
           args: [username, key],
         })) as string;
 
-        // Process AI fields
         let processed: string = textResult;
         if (
           key.startsWith("ai.") &&

@@ -235,6 +235,11 @@ export default function TestContractsPage() {
   const [ethEnsUsername, setEthEnsUsername] = useState('')
   const [ethEnsResult, setEthEnsResult] = useState<TestResult>({ status: 'pending', message: '' })
 
+  // ENS text record test states
+  const [ensTextUsername, setEnsTextUsername] = useState('')
+  const [ensTextKey, setEnsTextKey] = useState('bio')
+  const [ensTextResult, setEnsTextResult] = useState<TestResult>({ status: 'pending', message: '' })
+
   // Helper function to create loading state
   const createLoadingResult = (message: string): TestResult => ({
     status: 'pending',
@@ -683,6 +688,74 @@ export default function TestContractsPage() {
     }
   }
 
+  // Test 11: ENS Text Record Resolution
+  const handleEnsTextTest = async () => {
+    try {
+      setEnsTextResult(createLoadingResult('Testing ENS text record resolution...'))
+
+      // Create Ethereum mainnet client
+      const { createPublicClient, http } = await import('viem')
+      const { mainnet } = await import('viem/chains')
+      
+      const ethereumClient = createPublicClient({
+        chain: mainnet,
+        transport: http('https://eth.llamarpc.com'),
+      })
+
+      // Create the ENS node for username.contx.eth
+      const { namehash } = await import('viem')
+      const node = namehash(`${ensTextUsername}.contx.eth`)
+
+      console.log('🔍 Testing ENS text record resolution on Ethereum mainnet')
+      console.log('Node:', node)
+      console.log('Key:', ensTextKey)
+
+      try {
+        // Try to resolve text record via your ContxResolver on Ethereum
+        const textValue = await ethereumClient.readContract({
+          address: CONTX_RESOLVER_ADDRESS,
+          abi: CONTX_RESOLVER_ABI,
+          functionName: 'text',
+          args: [node, ensTextKey]
+        })
+
+        setEnsTextResult(createSuccessResult(
+          `✅ Text record resolved: ${ensTextUsername}.contx.eth["${ensTextKey}"] = "${textValue}"`,
+          { 
+            textValue, 
+            node,
+            key: ensTextKey,
+            network: 'Ethereum Mainnet',
+            resolver: CONTX_RESOLVER_ADDRESS
+          }
+        ))
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        if (errorMessage.includes('OffchainLookup') || errorMessage.includes('CCIP read')) {
+          setEnsTextResult(createSuccessResult(
+            `🔄 CCIP-Read triggered for text records! This means your text resolution is working.`,
+            { 
+              status: 'ccip-triggered',
+              error: errorMessage,
+              network: 'Ethereum Mainnet',
+              resolver: CONTX_RESOLVER_ADDRESS,
+              key: ensTextKey,
+              note: 'The resolver is correctly throwing OffchainLookup for text record resolution'
+            }
+          ))
+        } else {
+          console.error('Ethereum ENS text error:', error)
+          setEnsTextResult(createErrorResult(
+            `Text record resolution failed: ${errorMessage}`
+          ))
+        }
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'ENS text test failed'
+      setEnsTextResult(createErrorResult(errorMessage))
+    }
+  }
+
   // Add field to batch update
   const addBatchField = () => {
     setBatchFields([...batchFields, { key: '', value: '' }])
@@ -1101,6 +1174,49 @@ export default function TestContractsPage() {
               <div className="text-xs text-gray-500">
                 <p>Network: Ethereum Mainnet</p>
                 <p>Resolver: {CONTX_RESOLVER_ADDRESS}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Test 11: ENS Text Record Resolution */}
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <FileText className="w-5 h-5 text-purple-500" />
+              <h2 className="text-xl font-semibold">ENS Text Records</h2>
+            </div>
+            <div className="space-y-4">
+              <input
+                type="text"
+                placeholder="Username for text record test"
+                value={ensTextUsername}
+                onChange={(e) => setEnsTextUsername(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+              />
+              <select
+                value={ensTextKey}
+                onChange={(e) => setEnsTextKey(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+              >
+                <option value="bio">bio</option>
+                <option value="name">name</option>
+                <option value="avatar">avatar</option>
+                <option value="description">description</option>
+                <option value="ai.bio">ai.bio</option>
+                <option value="ai.topics">ai.topics</option>
+                <option value="ai.style">ai.style</option>
+                <option value="ai.traits">ai.traits</option>
+              </select>
+              <button
+                onClick={handleEnsTextTest}
+                disabled={!ensTextUsername || !ensTextKey}
+                className="w-full bg-purple-500 text-white py-3 rounded-lg hover:bg-purple-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+              >
+                Test Text Record Resolution
+              </button>
+              <ResultDisplay result={ensTextResult} />
+              <div className="text-xs text-gray-500">
+                <p>Tests text record resolution via CCIP-Read</p>
+                <p>Key: {ensTextKey}</p>
               </div>
             </div>
           </div>

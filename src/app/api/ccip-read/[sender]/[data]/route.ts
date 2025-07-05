@@ -57,23 +57,89 @@ function namehash(name: string): string {
   return hash
 }
 
-// Simple function to extract username from ENS node
-async function extractUsernameFromNode(node: string): Promise<string> {
+// Extract username from the CCIP-Read data directly
+function extractUsernameFromCCIPData(data: string): string {
+  // The CCIP-Read data contains the original domain name in the calldata
+  // Let's decode it from the hex data
+  const decodedBytes = Buffer.from(data.slice(2), 'hex')
+  
+  // The structure contains the gateway URL, let's look for the domain pattern
+  const dataStr = decodedBytes.toString('hex')
+  
+  // Look for the pattern that contains the domain name
+  // The gateway URL contains the domain, we can extract from there
+  try {
+    const urlHex = decodedBytes.toString()
+    const gatewayMatch = urlHex.match(/https:\/\/contx\.name\/api\/ccip-read/)
+    
+    if (gatewayMatch) {
+      // The domain should be in the node hash - let's try a different approach
+      // Parse the actual function call data to extract the domain
+      console.log('📊 CCIP Data analysis:', {
+        dataLength: decodedBytes.length,
+        dataHex: data.slice(0, 100) + '...',
+      })
+    }
+  } catch (error) {
+    console.log('Could not extract from URL, will use node-based approach')
+  }
+  
+  // For now, let's use a more comprehensive approach
+  // We can query the contract to see what usernames exist
+  const node = '0x' + decodedBytes.slice(0, 32).toString('hex')
   console.log('🔍 Extracting username from node:', node)
   
-  // Try common usernames first + any specific test cases
-  const commonUsernames = ['aaron', 'alice', 'bob', 'test', 'demo', 'charlie', 'diana', 'john', 'jane', 'admin', 'user', 'testuser', 'example', 'dev']
+  throw new Error(`Need to implement proper node-to-username resolution for node: ${node}`)
+}
+
+// Better approach: Query all registered usernames and find the match
+async function extractUsernameFromNode(node: string): Promise<string> {
+  console.log('🔍 Searching for username with node:', node)
   
-  for (const username of commonUsernames) {
+  // Instead of hardcoded list, we should query the contract for registered usernames
+  // But since the contract doesn't have a reverse lookup, we'll need to either:
+  // 1. Add a reverse mapping to the contract (requires contract change)
+  // 2. Use events to build a local database of registered usernames
+  // 3. Use a reasonable set of common patterns
+  
+  // For now, let's try a broader set and then implement proper solution
+  const patterns = [
+    // Common names
+    'aaron', 'alice', 'bob', 'test', 'demo', 'charlie', 'diana', 'john', 'jane', 
+    'admin', 'user', 'dev', 'example', 'test1', 'test2', 'test3',
+    // Single letters
+    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+    // Numbers
+    '1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
+    // Common web3 terms
+    'crypto', 'web3', 'eth', 'base', 'defi', 'nft', 'dao', 'gm'
+  ]
+  
+  for (const username of patterns) {
     const calculatedNode = namehash(`${username}.contx.eth`)
     if (calculatedNode.toLowerCase() === node.toLowerCase()) {
       console.log('✅ Found username:', username)
-      return username
+      
+      // Verify this username actually exists in the registry
+      try {
+        const profile = await basePublicClient.readContract({
+          address: REGISTRY_ADDRESS,
+          abi: REGISTRY_ABI,
+          functionName: 'getProfile',
+          args: [username],
+        }) as [Address, string, boolean]
+        
+        if (profile[2]) { // exists
+          return username
+        }
+      } catch (error) {
+        console.log(`Username ${username} matches node but not found in registry`)
+        continue
+      }
     }
   }
   
-  // If not found in common names, we need a different approach
-  throw new Error(`Username extraction failed for node: ${node}. Consider adding the username to common list or implementing a proper reverse lookup.`)
+  throw new Error(`Username not found for node: ${node}. The username might not be in our search patterns or not registered.`)
 }
 
 // Handle CCIP-Read requests from ENS resolver
@@ -120,12 +186,34 @@ export async function GET(
       
     } else if (selector === '0x59d1d43c') {
       // text(bytes32,string) - text record resolution
-      const keyLengthOffset = 36 + 32
-      const keyLength = decodedBytes.readUInt32BE(keyLengthOffset + 28)
-      const keyStart = keyLengthOffset + 32
-      const key = decodedBytes.slice(keyStart, keyStart + keyLength).toString('utf8')
+      console.log('🔍 Decoding text function call data')
+      console.log('Data length:', decodedBytes.length)
+      console.log('Data hex:', decodedBytes.toString('hex'))
+      
+      // The data structure for text(bytes32,string) should be:
+      // - bytes 0-32: node (already extracted above)
+      // - bytes 32-36: function selector (already extracted above)
+      // - bytes 36+: ABI encoded string parameter
+      
+      // For ABI encoded string, the structure is:
+      // - 32 bytes: offset to string data (0x20 = 32)
+      // - 32 bytes: string length
+      // - N bytes: string data (padded to 32-byte boundary)
+      
+      const abiEncodedString = decodedBytes.slice(36) // Everything after node + selector
+      console.log('ABI encoded string hex:', abiEncodedString.toString('hex'))
+      
+      // Skip the offset (first 32 bytes) and read length
+      const keyLength = abiEncodedString.readUInt32BE(32 + 28) // Read from position 60 (32 + 28)
+      console.log('Key length:', keyLength)
+      
+      // Extract the actual string data
+      const keyStart = 64 // Start after offset (32) + length (32)
+      const key = abiEncodedString.slice(keyStart, keyStart + keyLength).toString('utf8')
+      console.log('Extracted key:', `"${key}"`)
       
       console.log('📝 Resolving text for key:', key)
+      console.log('👤 Username:', username)
       
       const textValue = await basePublicClient.readContract({
         address: REGISTRY_ADDRESS,
@@ -133,6 +221,9 @@ export async function GET(
         functionName: 'getText',
         args: [username, key],
       }) as string
+      
+      console.log('📄 Retrieved text value:', textValue)
+      console.log('📏 Text value length:', textValue.length)
 
       // Convert comma-separated to JSON for AI fields
       let processedValue = textValue

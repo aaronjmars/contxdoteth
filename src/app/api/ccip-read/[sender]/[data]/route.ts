@@ -226,7 +226,9 @@ async function findUsernameFromNode(node: string): Promise<string> {
   
   console.log('❌ No matching username found for node:', node)
   console.log('❌ Available usernames:', usernames)
-  throw new Error(`Username not found for node: ${node}`)
+  
+  // Instead of throwing error, return a specific error that we can handle
+  throw new Error(`DOMAIN_NOT_FOUND: No username found for node ${node}. Available: [${usernames.join(', ')}]`)
 }
 
 export async function GET(
@@ -273,24 +275,35 @@ export async function GET(
       // addr(bytes32) - Address resolution
       console.log('📍 Processing address resolution...')
       
-      const username = await findUsernameFromNode(node)
-      console.log('👤 Resolved username:', username)
-      
-      console.log('📍 Calling getAddress on contract...')
-      const address = await basePublicClient.readContract({
-        address: CONTX_REGISTRY_ADDRESS,
-        abi: REGISTRY_ABI,
-        functionName: 'getAddress',
-        args: [username],
-      }) as Address
+      try {
+        const username = await findUsernameFromNode(node)
+        console.log('👤 Resolved username:', username)
+        
+        console.log('📍 Calling getAddress on contract...')
+        const address = await basePublicClient.readContract({
+          address: CONTX_REGISTRY_ADDRESS,
+          abi: REGISTRY_ABI,
+          functionName: 'getAddress',
+          args: [username],
+        }) as Address
 
-      console.log('📍 Contract returned address:', address)
+        console.log('📍 Contract returned address:', address)
 
-      // Encode as 32-byte value
-      const addressBytes = Buffer.alloc(32)
-      Buffer.from(address.slice(2), 'hex').copy(addressBytes, 12)
-      result = '0x' + addressBytes.toString('hex')
-      console.log('📍 Encoded result:', result)
+        // Encode as 32-byte value
+        const addressBytes = Buffer.alloc(32)
+        Buffer.from(address.slice(2), 'hex').copy(addressBytes, 12)
+        result = '0x' + addressBytes.toString('hex')
+        console.log('📍 Encoded result:', result)
+        
+      } catch (usernameError) {
+        if (usernameError instanceof Error && usernameError.message.includes('DOMAIN_NOT_FOUND')) {
+          console.log('📍 Domain not found, returning zero address')
+          // Return zero address for unknown domains (standard ENS behavior)
+          result = '0x' + '0'.repeat(64) // 32 bytes of zeros
+        } else {
+          throw usernameError // Re-throw other errors
+        }
+      }
       
     } else if (selector === '0x59d1d43c') {
       // text(bytes32,string) - Text record resolution
@@ -316,48 +329,95 @@ export async function GET(
       
       console.log('🔑 Decoded key:', key)
       
-      const username = await findUsernameFromNode(node)
-      console.log('👤 Resolved username:', username)
-      
-      console.log('📝 Calling getText on contract...')
-      const textValue = await basePublicClient.readContract({
-        address: CONTX_REGISTRY_ADDRESS,
-        abi: REGISTRY_ABI,
-        functionName: 'getText',
-        args: [username, key],
-      }) as string
-      
-      console.log('📄 Contract returned text:', `"${textValue}"`)
-      console.log('📄 Text length:', textValue.length)
+      try {
+        const username = await findUsernameFromNode(node)
+        console.log('👤 Resolved username:', username)
+        
+        console.log('📝 Calling getText on contract...')
+        let textValue = await basePublicClient.readContract({
+          address: CONTX_REGISTRY_ADDRESS,
+          abi: REGISTRY_ABI,
+          functionName: 'getText',
+          args: [username, key],
+        }) as string
+        
+        console.log('📄 Contract returned text:', `"${textValue}"`)
+        console.log('📄 Text length:', textValue.length)
+        
+        // If empty, also try profileData mapping directly
+        if (!textValue || textValue.length === 0) {
+          console.log('📝 getText returned empty, trying profileData directly...')
+          try {
+            const directValue = await basePublicClient.readContract({
+              address: CONTX_REGISTRY_ADDRESS,
+              abi: [
+                {
+                  inputs: [
+                    { name: 'username', type: 'string' },
+                    { name: 'key', type: 'string' }
+                  ],
+                  name: 'profileData',
+                  outputs: [{ name: '', type: 'string' }],
+                  stateMutability: 'view',
+                  type: 'function',
+                }
+              ],
+              functionName: 'profileData',
+              args: [username, key],
+            }) as string
+            
+            console.log('📄 Direct profileData returned:', `"${directValue}"`)
+            if (directValue && directValue.length > 0) {
+              console.log('📝 Using direct profileData result')
+              textValue = directValue
+            }
+          } catch (directError) {
+            console.log('📝 Direct profileData call failed:', directError)
+          }
+        }
 
-      // Convert to JSON for AI fields if needed
-      let processedValue = textValue
-      if (key.startsWith('ai.') && textValue && !textValue.startsWith('[') && !textValue.startsWith('{')) {
-        const items = textValue.split(',').map(item => item.trim())
-        processedValue = JSON.stringify(items)
-        console.log('🔄 Converted to JSON:', processedValue)
+        // Convert to JSON for AI fields if needed
+        let processedValue = textValue || '' // Ensure we have a string
+        if (key.startsWith('ai.') && processedValue && !processedValue.startsWith('[') && !processedValue.startsWith('{')) {
+          const items = processedValue.split(',').map(item => item.trim())
+          processedValue = JSON.stringify(items)
+          console.log('🔄 Converted to JSON:', processedValue)
+        }
+
+        console.log('📝 Final processed value:', `"${processedValue}"`)
+
+        // Encode string response for CCIP-Read
+        const stringBytes = Buffer.from(processedValue, 'utf8')
+        const lengthBytes = Buffer.alloc(32)
+        lengthBytes.writeUInt32BE(stringBytes.length, 28)
+        
+        const paddingLength = (32 - (stringBytes.length % 32)) % 32
+        const padding = paddingLength > 0 ? Buffer.alloc(paddingLength) : Buffer.alloc(0)
+        
+        const encodedResult = Buffer.concat([
+          Buffer.from('0000000000000000000000000000000000000000000000000000000000000020', 'hex'),
+          lengthBytes,
+          stringBytes,
+          padding
+        ])
+        
+        result = '0x' + encodedResult.toString('hex')
+        console.log('📝 Encoded result length:', result.length)
+        console.log('📝 Encoded result preview:', result.slice(0, 100) + '...')
+        
+      } catch (usernameError) {
+        if (usernameError instanceof Error && usernameError.message.includes('DOMAIN_NOT_FOUND')) {
+          console.log('📝 Domain not found, returning empty string')
+          // Return empty string for unknown domains (standard ENS behavior)
+          const emptyStringEncoded = Buffer.concat([
+            Buffer.from('0000000000000000000000000000000000000000000000000000000000000020', 'hex'), // offset
+            Buffer.alloc(32), // length = 0
+          ])
+          result = '0x' + emptyStringEncoded.toString('hex')
+        } else {
+          throw usernameError // Re-throw other errors
+        }
       }
-
-      console.log('📝 Final processed value:', `"${processedValue}"`)
-
-      // Encode string response for CCIP-Read
-      const stringBytes = Buffer.from(processedValue, 'utf8')
-      const lengthBytes = Buffer.alloc(32)
-      lengthBytes.writeUInt32BE(stringBytes.length, 28)
-      
-      const paddingLength = (32 - (stringBytes.length % 32)) % 32
-      const padding = paddingLength > 0 ? Buffer.alloc(paddingLength) : Buffer.alloc(0)
-      
-      const encodedResult = Buffer.concat([
-        Buffer.from('0000000000000000000000000000000000000000000000000000000000000020', 'hex'),
-        lengthBytes,
-        stringBytes,
-        padding
-      ])
-      
-      result = '0x' + encodedResult.toString('hex')
-      console.log('📝 Encoded result length:', result.length)
-      console.log('📝 Encoded result preview:', result.slice(0, 100) + '...')
       
     } else {
       console.log('❌ Unsupported function selector:', selector)

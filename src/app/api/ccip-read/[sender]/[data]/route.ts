@@ -57,40 +57,6 @@ function namehash(name: string): string {
   return hash
 }
 
-// Extract username from the CCIP-Read data directly
-function extractUsernameFromCCIPData(data: string): string {
-  // The CCIP-Read data contains the original domain name in the calldata
-  // Let's decode it from the hex data
-  const decodedBytes = Buffer.from(data.slice(2), 'hex')
-  
-  // The structure contains the gateway URL, let's look for the domain pattern
-  const dataStr = decodedBytes.toString('hex')
-  
-  // Look for the pattern that contains the domain name
-  // The gateway URL contains the domain, we can extract from there
-  try {
-    const urlHex = decodedBytes.toString()
-    const gatewayMatch = urlHex.match(/https:\/\/contx\.name\/api\/ccip-read/)
-    
-    if (gatewayMatch) {
-      // The domain should be in the node hash - let's try a different approach
-      // Parse the actual function call data to extract the domain
-      console.log('📊 CCIP Data analysis:', {
-        dataLength: decodedBytes.length,
-        dataHex: data.slice(0, 100) + '...',
-      })
-    }
-  } catch (error) {
-    console.log('Could not extract from URL, will use node-based approach')
-  }
-  
-  // For now, let's use a more comprehensive approach
-  // We can query the contract to see what usernames exist
-  const node = '0x' + decodedBytes.slice(0, 32).toString('hex')
-  console.log('🔍 Extracting username from node:', node)
-  
-  throw new Error(`Need to implement proper node-to-username resolution for node: ${node}`)
-}
 
 // Better approach: Query all registered usernames and find the match
 async function extractUsernameFromNode(node: string): Promise<string> {
@@ -133,7 +99,7 @@ async function extractUsernameFromNode(node: string): Promise<string> {
           return username
         }
       } catch (error) {
-        console.log(`Username ${username} matches node but not found in registry`)
+        console.log(`Username ${username} matches node but not found in registry ${error} `)
         continue
       }
     }

@@ -1,17 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createPublicClient, http, Address, keccak256, encodePacked, decodeAbiParameters, fallback } from 'viem'
-import { base } from 'viem/chains'
+import { createPublicClient, http, Address, decodeAbiParameters } from 'viem'
+import { base } from 'viem/chains' // Base mainnet
 
-const REGISTRY_ADDRESS = '0xa2bbe9b6a4ca01806b1cfac4174e4976ce2b0d70' as Address
+const CONTX_REGISTRY_ADDRESS = process.env.NEXT_PUBLIC_BASE_REGISTRY_ADDRESS as Address
 
 const basePublicClient = createPublicClient({
   chain: base,
-  transport: fallback([
-    http('https://base.llamarpc.com'),
-    http('https://mainnet.base.org'),
-    http('https://base-mainnet.g.alchemy.com/v2/demo'),
-    http('https://base.gateway.tenderly.co'),
-  ]),
+  transport: http(process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org'),
 })
 
 const REGISTRY_ABI = [
@@ -45,198 +40,107 @@ const REGISTRY_ABI = [
   },
 ] as const
 
-function namehash(name: string): string {
-  if (name === '') {
-    return '0x0000000000000000000000000000000000000000000000000000000000000000'
-  }
-  
-  const labels = name.split('.')
-  let hash = '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`
-  
-  for (let i = labels.length - 1; i >= 0; i--) {
-    const label = labels[i]
-    const labelHash = keccak256(new TextEncoder().encode(label))
-    hash = keccak256(encodePacked(['bytes32', 'bytes32'], [hash, labelHash]))
-  }
-  
-  return hash
-}
+// Cache to avoid repeated contract calls
+let usernamesCache: string[] | null = null
+let cacheTimestamp = 0
+const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
+// Get all registered usernames from your contract
+async function getAllUsernames(): Promise<string[]> {
+  const now = Date.now()
+  
+  // Return cached usernames if still fresh
+  if (usernamesCache && (now - cacheTimestamp) < CACHE_TTL) {
+    console.log('📋 Using cached usernames:', usernamesCache)
+    return usernamesCache
+  }
 
-// Query contract events to find all registered usernames
-async function extractUsernameFromNode(node: string): Promise<string> {
-  console.log('🔍 Searching for username with node:', node)
+  console.log('🔍 Fetching all usernames from contract events...')
+  console.log('📋 Contract address:', CONTX_REGISTRY_ADDRESS)
+  console.log('📋 Chain:', basePublicClient.chain?.name)
+  console.log('📋 Chain ID:', basePublicClient.chain?.id)
   
   try {
-    // First, try common patterns for quick resolution
-    const commonPatterns = [
-      'aaron', 'alice', 'bob', 'test', 'demo', 'admin', 'user', 'dev', 'example'
-    ]
+    // Get from SubdomainRegistered events
+    console.log('📋 Querying SubdomainRegistered events from block 0...')
     
-    console.log('🔍 Trying common username patterns first...')
-    for (const username of commonPatterns) {
-      const calculatedNode = namehash(`${username}.contx.eth`)
-      if (calculatedNode.toLowerCase() === node.toLowerCase()) {
-        console.log('✅ Found username via common pattern:', username)
-        
-        // Verify this username actually exists in the registry
-        try {
-          const profile = await basePublicClient.readContract({
-            address: REGISTRY_ADDRESS,
-            abi: REGISTRY_ABI,
-            functionName: 'getProfile',
-            args: [username],
-          }) as [Address, string, boolean]
-          
-          if (profile[2]) { // exists
-            return username
-          }
-        } catch {
-          console.log(`Username ${username} matches node but not found in registry`)
-          continue
+    const events = await basePublicClient.getContractEvents({
+      address: CONTX_REGISTRY_ADDRESS,
+      abi: [
+        {
+          anonymous: false,
+          inputs: [
+            { indexed: true, name: 'username', type: 'string' },
+            { indexed: true, name: 'owner', type: 'address' }
+          ],
+          name: 'SubdomainRegistered',
+          type: 'event'
         }
-      }
-    }
-
-    // Try to get events for more comprehensive search
-    try {
-      console.log('🔍 Fetching registration events...')
-      const eventSignature = 'SubdomainRegistered(string,address)'
-      const eventTopic = keccak256(new TextEncoder().encode(eventSignature))
-      
-      const events = await basePublicClient.getLogs({
-        address: REGISTRY_ADDRESS,
-        fromBlock: 'earliest',
-        toBlock: 'latest'
+      ],
+      eventName: 'SubdomainRegistered',
+      fromBlock: BigInt(0)
+    })
+    
+    console.log(`📋 Raw events found: ${events.length}`)
+    events.forEach((event, i) => {
+      console.log(`📋 Event ${i}:`, {
+        username: event.args.username,
+        owner: event.args.owner,
+        blockNumber: event.blockNumber
       })
-      
-      console.log(`📋 Found ${events.length} total events`)
-      
-      // Filter for SubdomainRegistered events
-      const registrationEvents = events.filter(event => 
-        event.topics && event.topics[0] === eventTopic
-      )
-      
-      console.log(`📋 Found ${registrationEvents.length} registration events`)
-      
-      // Extract usernames from events and check each one
-      for (const event of registrationEvents) {
-      if (event.transactionHash) {
-        try {
-          // Get the transaction receipt to get the decoded event data
-          const receipt = await basePublicClient.getTransactionReceipt({
-            hash: event.transactionHash
-          })
-          
-          // Find the SubdomainRegistered event in the receipt
-          for (const log of receipt.logs) {
-            if (log.address.toLowerCase() === REGISTRY_ADDRESS.toLowerCase() && 
-                log.topics && log.topics[0] === eventTopic) {
-              
-              // Decode the non-indexed data (the actual username string)
-              if (log.data && log.data !== '0x') {
-                try {
-                  // The data contains the non-indexed parameters
-                  // Since username is indexed, we need to decode from the transaction input instead
-                  const transaction = await basePublicClient.getTransaction({
-                    hash: event.transactionHash
-                  })
-                  
-                  if (transaction.input && transaction.input.length > 10) {
-                    // Decode the register function call
-                    const callData = transaction.input.slice(10) // Remove function selector
-                    
-                    // Try to decode the parameters - register(string username, string name, string bio)
-                    try {
-                      const decoded = decodeAbiParameters(
-                        [
-                          { name: 'username', type: 'string' },
-                          { name: 'name', type: 'string' },
-                          { name: 'bio', type: 'string' }
-                        ],
-                        `0x${callData}`
-                      )
-                      
-                      const username = decoded[0]
-                      if (username) {
-                        const calculatedNode = namehash(`${username}.contx.eth`)
-                        if (calculatedNode.toLowerCase() === node.toLowerCase()) {
-                          console.log('✅ Found username from event transaction:', username)
-                          return username
-                        }
-                      }
-                    } catch (decodeError) {
-                      console.log('Failed to decode transaction parameters:', decodeError)
-                    }
-                  }
-                } catch (dataError) {
-                  console.log('Error decoding event data:', dataError)
-                }
-              }
-            }
-          }
-        } catch (eventError) {
-          console.log('Error processing event:', eventError)
-        }
-      }
-    }
+    })
     
-    } catch (eventFetchError) {
-      console.log('⚠️ Failed to fetch events, falling back to pattern matching:', eventFetchError)
-    }
+    const usernames = events.map(event => event.args.username).filter(Boolean) as string[]
     
-    console.log('🔄 Falling back to comprehensive pattern matching...')
+    console.log(`📋 Extracted ${usernames.length} usernames:`, usernames)
     
-    // Fallback to comprehensive pattern matching
-    const patterns = [
-      // Common names
-      'aaron', 'alice', 'bob', 'test', 'demo', 'charlie', 'diana', 'john', 'jane',
-      'admin', 'user', 'dev', 'example', 'test1', 'test2', 'test3',
-      // Single characters
-      'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-      '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-      // Two character combinations (most common)
-      'ab', 'ac', 'ad', 'ae', 'af', 'ag', 'ah', 'ai', 'aj', 'ak', 'al', 'am', 'an', 'ao', 'ap', 'aq', 'ar', 'as', 'at', 'au', 'av', 'aw', 'ax', 'ay', 'az',
-      'ba', 'bb', 'bc', 'bd', 'be', 'bf', 'bg', 'bh', 'bi', 'bj', 'bk', 'bl', 'bm', 'bn', 'bo', 'bp', 'bq', 'br', 'bs', 'bt', 'bu', 'bv', 'bw', 'bx', 'by', 'bz',
-      // Common web3 terms
-      'crypto', 'web3', 'eth', 'base', 'defi', 'nft', 'dao', 'gm', 'hello', 'world'
-    ]
+    // Cache the results
+    usernamesCache = usernames
+    cacheTimestamp = now
     
-    console.log(`🔍 Checking ${patterns.length} username patterns...`)
+    return usernames
     
-    for (const username of patterns) {
-      const calculatedNode = namehash(`${username}.contx.eth`)
-      if (calculatedNode.toLowerCase() === node.toLowerCase()) {
-        console.log('✅ Found username via pattern:', username)
-        
-        // Verify this username actually exists in the registry
-        try {
-          const profile = await basePublicClient.readContract({
-            address: REGISTRY_ADDRESS,
-            abi: REGISTRY_ABI,
-            functionName: 'getProfile',
-            args: [username],
-          }) as [Address, string, boolean]
-          
-          if (profile[2]) { // exists
-            return username
-          }
-        } catch {
-          console.log(`Username ${username} matches node but not found in registry`)
-          continue
-        }
-      }
-    }
-    
-    throw new Error(`Username not found for node: ${node}. The username might not be in our search patterns.`)
-    
-  } catch (err) {
-    console.error('Error in username extraction:', err)
-    throw new Error(`Failed to extract username for node: ${node}`)
+  } catch (error) {
+    console.error('❌ Error fetching usernames from events:', error)
+    console.error('❌ Error details:', {
+      name: error instanceof Error ? error.name : 'Unknown',
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    })
+    throw error
   }
 }
 
-// Handle CCIP-Read requests from ENS resolver
+// Find username by comparing namehashes
+async function findUsernameFromNode(node: string): Promise<string> {
+  console.log('🔍 Looking for username for node:', node)
+  
+  const usernames = await getAllUsernames()
+  console.log(`🔍 Checking ${usernames.length} usernames against node...`)
+  
+  // Import namehash function
+  const { namehash } = await import('viem')
+  
+  // Check each username
+  for (const username of usernames) {
+    const expectedNode = namehash(`${username}.contx.eth`)
+    
+    console.log(`🔍 Checking "${username}":`)
+    console.log(`   Expected: ${expectedNode}`)
+    console.log(`   Received: ${node}`)
+    console.log(`   Match: ${expectedNode.toLowerCase() === node.toLowerCase()}`)
+    
+    if (expectedNode.toLowerCase() === node.toLowerCase()) {
+      console.log('✅ Found matching username:', username)
+      return username
+    }
+  }
+  
+  console.log('❌ No matching username found for node:', node)
+  console.log('❌ Available usernames:', usernames)
+  throw new Error(`Username not found for node: ${node}`)
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ sender: string; data: string }> }
@@ -244,126 +148,117 @@ export async function GET(
   try {
     const { sender, data } = await params
     
-    console.log('🌉 CCIP-Read request:', { sender, data })
+    console.log('🌉 CCIP-Read request started')
+    console.log('📤 Sender:', sender)
+    console.log('📦 Data:', data)
+    console.log('📦 Data length:', data.length)
     
-    let decodedBytes: Buffer
-    try {
-      decodedBytes = Buffer.from(data.slice(2), 'hex')
-    } catch {
-      return NextResponse.json({ error: 'Invalid hex data' }, { status: 400 })
-    }
+    const callData = Buffer.from(data.slice(2), 'hex')
+    const selector = '0x' + callData.slice(0, 4).toString('hex')
     
-    if (decodedBytes.length < 36) {
-      return NextResponse.json({ error: 'Invalid data length' }, { status: 400 })
-    }
-
-    const node = '0x' + decodedBytes.slice(0, 32).toString('hex')
-    const selector = '0x' + decodedBytes.slice(32, 36).toString('hex')
-
-    const username = await extractUsernameFromNode(node)
-    console.log('👤 Username:', username)
+    console.log('🎯 Function selector:', selector)
+    console.log('📦 Call data length:', callData.length)
 
     let result: string
 
     if (selector === '0x3b3b57de') {
-      // addr(bytes32) - address resolution
+      // addr(bytes32) - Address resolution
+      console.log('📍 Processing address resolution...')
+      
+      const node = '0x' + callData.slice(4, 36).toString('hex')
+      console.log('🔗 Extracted node:', node)
+      
+      const username = await findUsernameFromNode(node)
+      console.log('👤 Resolved username:', username)
+      
+      console.log('📍 Calling getAddress on contract...')
       const address = await basePublicClient.readContract({
-        address: REGISTRY_ADDRESS,
+        address: CONTX_REGISTRY_ADDRESS,
         abi: REGISTRY_ABI,
         functionName: 'getAddress',
         args: [username],
       }) as Address
 
+      console.log('📍 Contract returned address:', address)
+
+      // Encode as 32-byte value
       const addressBytes = Buffer.alloc(32)
       Buffer.from(address.slice(2), 'hex').copy(addressBytes, 12)
       result = '0x' + addressBytes.toString('hex')
+      console.log('📍 Encoded result:', result)
       
     } else if (selector === '0x59d1d43c') {
-      // text(bytes32,string) - text record resolution
-      console.log('🔍 Decoding text function call data')
-      console.log('Data length:', decodedBytes.length)
-      console.log('Data hex:', decodedBytes.toString('hex'))
+      // text(bytes32,string) - Text record resolution
+      console.log('📝 Processing text record resolution...')
       
-      // Use viem's built-in ABI decoding for the text function parameters
-      // The full call data is text(bytes32 node, string key)
-      // We need to decode the string parameter
+      const parametersData = ('0x' + callData.slice(4).toString('hex')) as `0x${string}`
+      console.log('📝 Parameters data:', parametersData)
       
-      let key: string
-      try {
-        // Decode the function call parameters
-        const callData = '0x' + decodedBytes.toString('hex')
-        console.log('Full call data:', callData)
-        
-        // Extract just the parameters part (after the function selector)
-        const parametersData = ('0x' + decodedBytes.slice(4).toString('hex')) as `0x${string}`
-        console.log('Parameters data:', parametersData)
-        
-        // Decode the parameters: (bytes32 node, string key)
-        const decoded = decodeAbiParameters(
-          [
-            { name: 'node', type: 'bytes32' },
-            { name: 'key', type: 'string' }
-          ],
-          parametersData
-        )
-        
-        key = decoded[1] as string
-        console.log('✅ Decoded key via ABI:', `"${key}"`)
-        
-      } catch (decodeError) {
-        console.error('❌ Failed to decode text function parameters:', decodeError)
-        throw new Error('Failed to decode text function call data')
-      }
+      const decoded = decodeAbiParameters(
+        [
+          { name: 'node', type: 'bytes32' },
+          { name: 'key', type: 'string' }
+        ],
+        parametersData
+      )
       
-      console.log('📝 Resolving text for key:', key)
-      console.log('👤 Username:', username)
+      const node = decoded[0] as string
+      const key = decoded[1] as string
       
+      console.log('🔗 Decoded node:', node)
+      console.log('🔑 Decoded key:', key)
+      
+      const username = await findUsernameFromNode(node)
+      console.log('👤 Resolved username:', username)
+      
+      console.log('📝 Calling getText on contract...')
       const textValue = await basePublicClient.readContract({
-        address: REGISTRY_ADDRESS,
+        address: CONTX_REGISTRY_ADDRESS,
         abi: REGISTRY_ABI,
         functionName: 'getText',
         args: [username, key],
       }) as string
       
-      console.log('📄 Retrieved text value:', textValue)
-      console.log('📏 Text value length:', textValue.length)
+      console.log('📄 Contract returned text:', `"${textValue}"`)
+      console.log('📄 Text length:', textValue.length)
 
-      // Convert comma-separated to JSON for AI fields
+      // Convert to JSON for AI fields if needed
       let processedValue = textValue
-      if (key.startsWith('ai.') && textValue && !textValue.startsWith('[')) {
+      if (key.startsWith('ai.') && textValue && !textValue.startsWith('[') && !textValue.startsWith('{')) {
         const items = textValue.split(',').map(item => item.trim())
         processedValue = JSON.stringify(items)
+        console.log('🔄 Converted to JSON:', processedValue)
       }
 
+      console.log('📝 Final processed value:', `"${processedValue}"`)
+
+      // Encode string response for CCIP-Read
       const stringBytes = Buffer.from(processedValue, 'utf8')
       const lengthBytes = Buffer.alloc(32)
       lengthBytes.writeUInt32BE(stringBytes.length, 28)
       
-      const paddingLength = 32 - (stringBytes.length % 32)
-      const padding = paddingLength === 32 ? Buffer.alloc(0) : Buffer.alloc(paddingLength)
+      const paddingLength = (32 - (stringBytes.length % 32)) % 32
+      const padding = paddingLength > 0 ? Buffer.alloc(paddingLength) : Buffer.alloc(0)
       
       const encodedResult = Buffer.concat([
-        Buffer.alloc(32),
+        Buffer.from('0000000000000000000000000000000000000000000000000000000000000020', 'hex'),
         lengthBytes,
         stringBytes,
         padding
       ])
       
-      encodedResult.writeUInt32BE(32, 28)
       result = '0x' + encodedResult.toString('hex')
+      console.log('📝 Encoded result length:', result.length)
+      console.log('📝 Encoded result preview:', result.slice(0, 100) + '...')
       
     } else {
-      return NextResponse.json({ error: `Function not supported: ${selector}` }, { 
-        status: 404,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        }
-      })
+      console.log('❌ Unsupported function selector:', selector)
+      return NextResponse.json({ 
+        error: `Function not supported: ${selector}` 
+      }, { status: 404 })
     }
 
-    console.log('✅ CCIP-Read success for:', username)
+    console.log('✅ CCIP-Read completed successfully!')
     return NextResponse.json({ data: result }, {
       headers: {
         'Access-Control-Allow-Origin': '*',
@@ -372,11 +267,12 @@ export async function GET(
       }
     })
 
-  } catch (err) {
-    console.error('❌ CCIP-Read error:', err)
+  } catch (error) {
+    console.error('❌ CCIP-Read error:', error)
+    console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack')
     return NextResponse.json({
       error: 'Resolution failed',
-      details: err instanceof Error ? err.message : 'Unknown error',
+      details: error instanceof Error ? error.message : 'Unknown error'
     }, { 
       status: 500,
       headers: {
@@ -388,7 +284,92 @@ export async function GET(
   }
 }
 
-// Handle CORS preflight requests
+// Debug endpoint for direct testing
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { action, username, key, node } = body
+    
+    console.log('🧪 Debug POST request:', { action, username, key, node })
+
+    if (action === 'test-usernames') {
+      console.log('🧪 Testing username discovery...')
+      const usernames = await getAllUsernames()
+      return NextResponse.json({ 
+        success: true, 
+        usernames,
+        count: usernames.length 
+      })
+    }
+
+    if (action === 'test-namehash' && username) {
+      console.log('🧪 Testing namehash calculation...')
+      const { namehash } = await import('viem')
+      const calculatedNode = namehash(`${username}.contx.eth`)
+      return NextResponse.json({ 
+        success: true, 
+        username,
+        domain: `${username}.contx.eth`,
+        namehash: calculatedNode
+      })
+    }
+
+    if (action === 'test-address' && username) {
+      console.log('🧪 Testing address resolution...')
+      const address = await basePublicClient.readContract({
+        address: CONTX_REGISTRY_ADDRESS,
+        abi: REGISTRY_ABI,
+        functionName: 'getAddress',
+        args: [username],
+      }) as Address
+      return NextResponse.json({ 
+        success: true, 
+        username,
+        address
+      })
+    }
+
+    if (action === 'test-text' && username && key) {
+      console.log('🧪 Testing text resolution...')
+      const textValue = await basePublicClient.readContract({
+        address: CONTX_REGISTRY_ADDRESS,
+        abi: REGISTRY_ABI,
+        functionName: 'getText',
+        args: [username, key],
+      }) as string
+      return NextResponse.json({ 
+        success: true, 
+        username,
+        key,
+        value: textValue,
+        length: textValue.length
+      })
+    }
+
+    if (action === 'test-node-lookup' && node) {
+      console.log('🧪 Testing node to username lookup...')
+      const username = await findUsernameFromNode(node)
+      return NextResponse.json({ 
+        success: true, 
+        node,
+        username
+      })
+    }
+
+    return NextResponse.json({ 
+      error: 'Invalid action. Use: test-usernames, test-namehash, test-address, test-text, test-node-lookup' 
+    }, { status: 400 })
+
+  } catch (error) {
+    console.error('🧪 Debug POST error:', error)
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    }, { status: 500 })
+  }
+}
+
 export async function OPTIONS() {
   return new Response(null, {
     status: 200,

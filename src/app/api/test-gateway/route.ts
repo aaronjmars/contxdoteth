@@ -1,9 +1,9 @@
 // src/app/api/test-gateway/route.ts - Updated for Production
 import { NextRequest, NextResponse } from 'next/server'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const baseUrl = process.env.NODE_ENV === 'production' 
-    ? 'https://contx.name'
+    ? 'https://www.contx.name'  // Use www subdomain
     : 'http://localhost:3000'
 
   try {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createPublicClient, http, Address, keccak256, encodePacked } from 'viem'
+import { createPublicClient, http, Address, keccak256, encodePacked, decodeAbiParameters } from 'viem'
 import { base } from 'viem/chains'
 
 const REGISTRY_ADDRESS = '0xa2bbe9b6a4ca01806b1cfac4174e4976ce2b0d70' as Address
@@ -58,54 +58,141 @@ function namehash(name: string): string {
 }
 
 
-// Better approach: Query all registered usernames and find the match
+// Query contract events to find all registered usernames
 async function extractUsernameFromNode(node: string): Promise<string> {
   console.log('🔍 Searching for username with node:', node)
   
-  // Instead of hardcoded list, we should query the contract for registered usernames
-  // But since the contract doesn't have a reverse lookup, we'll need to either:
-  // 1. Add a reverse mapping to the contract (requires contract change)
-  // 2. Use events to build a local database of registered usernames
-  // 3. Use a reasonable set of common patterns
-  
-  // For now, let's try a broader set and then implement proper solution
-  const patterns = [
-    // Common names
-    'aaron', 'alice', 'bob', 'test', 'demo', 'charlie', 'diana', 'john', 'jane', 
-    'admin', 'user', 'dev', 'example', 'test1', 'test2', 'test3',
-    // Single letters
-    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-    // Numbers
-    '1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
-    // Common web3 terms
-    'crypto', 'web3', 'eth', 'base', 'defi', 'nft', 'dao', 'gm'
-  ]
-  
-  for (const username of patterns) {
-    const calculatedNode = namehash(`${username}.contx.eth`)
-    if (calculatedNode.toLowerCase() === node.toLowerCase()) {
-      console.log('✅ Found username:', username)
-      
-      // Verify this username actually exists in the registry
-      try {
-        const profile = await basePublicClient.readContract({
-          address: REGISTRY_ADDRESS,
-          abi: REGISTRY_ABI,
-          functionName: 'getProfile',
-          args: [username],
-        }) as [Address, string, boolean]
-        
-        if (profile[2]) { // exists
-          return username
+  try {
+    // Get all SubdomainRegistered events from the contract
+    const eventSignature = 'SubdomainRegistered(string,address)'
+    const eventTopic = keccak256(new TextEncoder().encode(eventSignature))
+    
+    const events = await basePublicClient.getLogs({
+      address: REGISTRY_ADDRESS,
+      fromBlock: 'earliest',
+      toBlock: 'latest'
+    })
+    
+    console.log(`📋 Found ${events.length} total events`)
+    
+    // Filter for SubdomainRegistered events
+    const registrationEvents = events.filter(event => 
+      event.topics && event.topics[0] === eventTopic
+    )
+    
+    console.log(`📋 Found ${registrationEvents.length} registration events`)
+    
+    // Extract usernames from events and check each one
+    for (const event of registrationEvents) {
+      if (event.transactionHash) {
+        try {
+          // Get the transaction receipt to get the decoded event data
+          const receipt = await basePublicClient.getTransactionReceipt({
+            hash: event.transactionHash
+          })
+          
+          // Find the SubdomainRegistered event in the receipt
+          for (const log of receipt.logs) {
+            if (log.address.toLowerCase() === REGISTRY_ADDRESS.toLowerCase() && 
+                log.topics && log.topics[0] === eventTopic) {
+              
+              // Decode the non-indexed data (the actual username string)
+              if (log.data && log.data !== '0x') {
+                try {
+                  // The data contains the non-indexed parameters
+                  // Since username is indexed, we need to decode from the transaction input instead
+                  const transaction = await basePublicClient.getTransaction({
+                    hash: event.transactionHash
+                  })
+                  
+                  if (transaction.input && transaction.input.length > 10) {
+                    // Decode the register function call
+                    const callData = transaction.input.slice(10) // Remove function selector
+                    
+                    // Try to decode the parameters - register(string username, string name, string bio)
+                    try {
+                      const decoded = decodeAbiParameters(
+                        [
+                          { name: 'username', type: 'string' },
+                          { name: 'name', type: 'string' },
+                          { name: 'bio', type: 'string' }
+                        ],
+                        `0x${callData}`
+                      )
+                      
+                      const username = decoded[0]
+                      if (username) {
+                        const calculatedNode = namehash(`${username}.contx.eth`)
+                        if (calculatedNode.toLowerCase() === node.toLowerCase()) {
+                          console.log('✅ Found username from event transaction:', username)
+                          return username
+                        }
+                      }
+                    } catch (decodeError) {
+                      console.log('Failed to decode transaction parameters:', decodeError)
+                    }
+                  }
+                } catch (dataError) {
+                  console.log('Error decoding event data:', dataError)
+                }
+              }
+            }
+          }
+        } catch (eventError) {
+          console.log('Error processing event:', eventError)
         }
-      } catch (error) {
-        console.log(`Username ${username} matches node but not found in registry ${error} `)
-        continue
       }
     }
+    
+    console.log('🔄 Events approach failed, falling back to pattern matching...')
+    
+    // Fallback to comprehensive pattern matching
+    const patterns = [
+      // Common names
+      'aaron', 'alice', 'bob', 'test', 'demo', 'charlie', 'diana', 'john', 'jane',
+      'admin', 'user', 'dev', 'example', 'test1', 'test2', 'test3',
+      // Single characters
+      'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+      '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+      // Two character combinations (most common)
+      'ab', 'ac', 'ad', 'ae', 'af', 'ag', 'ah', 'ai', 'aj', 'ak', 'al', 'am', 'an', 'ao', 'ap', 'aq', 'ar', 'as', 'at', 'au', 'av', 'aw', 'ax', 'ay', 'az',
+      'ba', 'bb', 'bc', 'bd', 'be', 'bf', 'bg', 'bh', 'bi', 'bj', 'bk', 'bl', 'bm', 'bn', 'bo', 'bp', 'bq', 'br', 'bs', 'bt', 'bu', 'bv', 'bw', 'bx', 'by', 'bz',
+      // Common web3 terms
+      'crypto', 'web3', 'eth', 'base', 'defi', 'nft', 'dao', 'gm', 'hello', 'world'
+    ]
+    
+    console.log(`🔍 Checking ${patterns.length} username patterns...`)
+    
+    for (const username of patterns) {
+      const calculatedNode = namehash(`${username}.contx.eth`)
+      if (calculatedNode.toLowerCase() === node.toLowerCase()) {
+        console.log('✅ Found username via pattern:', username)
+        
+        // Verify this username actually exists in the registry
+        try {
+          const profile = await basePublicClient.readContract({
+            address: REGISTRY_ADDRESS,
+            abi: REGISTRY_ABI,
+            functionName: 'getProfile',
+            args: [username],
+          }) as [Address, string, boolean]
+          
+          if (profile[2]) { // exists
+            return username
+          }
+        } catch {
+          console.log(`Username ${username} matches node but not found in registry`)
+          continue
+        }
+      }
+    }
+    
+    throw new Error(`Username not found for node: ${node}. The username might not be in our search patterns.`)
+    
+  } catch (err) {
+    console.error('Error in username extraction:', err)
+    throw new Error(`Failed to extract username for node: ${node}`)
   }
-  
-  throw new Error(`Username not found for node: ${node}. The username might not be in our search patterns or not registered.`)
 }
 
 // Handle CCIP-Read requests from ENS resolver
@@ -156,27 +243,36 @@ export async function GET(
       console.log('Data length:', decodedBytes.length)
       console.log('Data hex:', decodedBytes.toString('hex'))
       
-      // The data structure for text(bytes32,string) should be:
-      // - bytes 0-32: node (already extracted above)
-      // - bytes 32-36: function selector (already extracted above)
-      // - bytes 36+: ABI encoded string parameter
+      // Use viem's built-in ABI decoding for the text function parameters
+      // The full call data is text(bytes32 node, string key)
+      // We need to decode the string parameter
       
-      // For ABI encoded string, the structure is:
-      // - 32 bytes: offset to string data (0x20 = 32)
-      // - 32 bytes: string length
-      // - N bytes: string data (padded to 32-byte boundary)
-      
-      const abiEncodedString = decodedBytes.slice(36) // Everything after node + selector
-      console.log('ABI encoded string hex:', abiEncodedString.toString('hex'))
-      
-      // Skip the offset (first 32 bytes) and read length
-      const keyLength = abiEncodedString.readUInt32BE(32 + 28) // Read from position 60 (32 + 28)
-      console.log('Key length:', keyLength)
-      
-      // Extract the actual string data
-      const keyStart = 64 // Start after offset (32) + length (32)
-      const key = abiEncodedString.slice(keyStart, keyStart + keyLength).toString('utf8')
-      console.log('Extracted key:', `"${key}"`)
+      let key: string
+      try {
+        // Decode the function call parameters
+        const callData = '0x' + decodedBytes.toString('hex')
+        console.log('Full call data:', callData)
+        
+        // Extract just the parameters part (after the function selector)
+        const parametersData = ('0x' + decodedBytes.slice(4).toString('hex')) as `0x${string}`
+        console.log('Parameters data:', parametersData)
+        
+        // Decode the parameters: (bytes32 node, string key)
+        const decoded = decodeAbiParameters(
+          [
+            { name: 'node', type: 'bytes32' },
+            { name: 'key', type: 'string' }
+          ],
+          parametersData
+        )
+        
+        key = decoded[1] as string
+        console.log('✅ Decoded key via ABI:', `"${key}"`)
+        
+      } catch (decodeError) {
+        console.error('❌ Failed to decode text function parameters:', decodeError)
+        throw new Error('Failed to decode text function call data')
+      }
       
       console.log('📝 Resolving text for key:', key)
       console.log('👤 Username:', username)

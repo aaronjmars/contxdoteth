@@ -6,7 +6,7 @@ export function AnimatedLogo() {
   return (
     <div className="flex items-baseline">
       {/* Static "Contx" part */}
-      <span className="text-4xl md:text-5xl font-bold tracking-tight text-foreground">
+      <span className="text-4xl md:text-5xl font-bold tracking-tight" style={{ color: '#1D1D1F' }}>
         Contx
       </span>
       

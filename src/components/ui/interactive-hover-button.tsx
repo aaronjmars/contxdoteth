@@ -27,7 +27,7 @@ const InteractiveHoverButton = React.forwardRef<
         <span>{text}</span>
         <ArrowRight className="h-4 w-4" />
       </div>
-      <div className="absolute left-1/2 top-1/2 h-0 w-0 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary transition-all duration-300 group-hover:h-full group-hover:w-full group-hover:scale-150"></div>
+      <div className="absolute left-1/2 top-1/2 h-0 w-0 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 transition-all duration-300 group-hover:h-full group-hover:w-full group-hover:scale-150"></div>
     </button>
   );
 });

@@ -178,32 +178,32 @@
     animation: gradient-foreground-3 8s infinite;
   }
 
-  /* Neon-style gradients */
+  /* Blue/Purple/Cyan gradients */
   .from-gradient-1-start {
-    --tw-gradient-from: #39ff14; /* Neon green */
-    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(57, 255, 20, 0));
+    --tw-gradient-from: #3B82F6; /* Blue */
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(59, 130, 246, 0));
   }
 
   .to-gradient-1-end {
-    --tw-gradient-to: #00ffff; /* Neon cyan */
+    --tw-gradient-to: #06B6D4; /* Cyan */
   }
 
   .from-gradient-2-start {
-    --tw-gradient-from: #ff073a; /* Neon red-pink */
-    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(255, 7, 58, 0));
+    --tw-gradient-from: #8B5CF6; /* Purple */
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(139, 92, 246, 0));
   }
 
   .to-gradient-2-end {
-    --tw-gradient-to: #ff6ec7; /* Neon magenta */
+    --tw-gradient-to: #3B82F6; /* Blue */
   }
 
   .from-gradient-3-start {
-    --tw-gradient-from: #faff00; /* Neon yellow */
-    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(250, 255, 0, 0));
+    --tw-gradient-from: #06B6D4; /* Cyan */
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(6, 182, 212, 0));
   }
 
   .to-gradient-3-end {
-    --tw-gradient-to: #00f0ff; /* Electric blue */
+    --tw-gradient-to: #8B5CF6; /* Purple */
   }
 
   @keyframes gradient-background-1 {

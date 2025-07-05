@@ -158,7 +158,7 @@ function render() {
     // @ts-ignore
     ctx.globalCompositeOperation = "lighter";
     // @ts-ignore
-    ctx.strokeStyle = "hsla(" + Math.round(f.update()) + ",100%,50%,0.025)";
+    ctx.strokeStyle = "hsla(" + Math.round(f.update()) + ",100%,60%,0.08)";
     // @ts-ignore
     ctx.lineWidth = 10;
     for (var e, t = 0; t < E.trails; t++) {
@@ -190,8 +190,8 @@ var ctx,
   E = {
     debug: true,
     friction: 0.5,
-    trails: 80,
-    size: 50,
+    trails: 100,
+    size: 60,
     dampening: 0.025,
     tension: 0.99,
   };

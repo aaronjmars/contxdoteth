@@ -82,10 +82,8 @@ export default function Dashboard() {
         }
         
         setUserDomain(foundDomain)
-        console.log(`🔍 Domain check complete. Found domain: ${foundDomain || 'None'}`)
         
       } catch (error) {
-        console.error('❌ Error checking for existing domain:', error)
       } finally {
         setCheckingDomain(false)
       }

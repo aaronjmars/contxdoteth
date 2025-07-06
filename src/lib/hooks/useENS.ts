@@ -68,7 +68,6 @@ export function useENS() {
 
       return available as boolean
     } catch (error) {
-      console.error('Error checking availability:', error)
       setRegistrationStatus(prev => ({
         ...prev,
         isLoading: false,
@@ -95,7 +94,6 @@ export function useENS() {
       setRegistrationStatus(prev => ({ ...prev, price }))
       return price
     } catch (error) {
-      console.error('Error getting price:', error)
       return null
     }
   }, [publicClient])
@@ -108,20 +106,6 @@ export function useENS() {
     const { name, aiContext, duration = 365 * 24 * 60 * 60 } = options
     const formattedName = formatBasename(name)
 
-    console.log('🧪 CLEAN START - DEBUGGING REGISTRATION')
-    console.log('📋 INPUT DATA:')
-    console.log('- Original name:', name)
-    console.log('- Formatted name:', formattedName)
-    console.log('- Duration:', duration)
-    console.log('- User address:', address)
-    console.log('- Chain ID:', publicClient.chain?.id)
-    console.log('- Network:', publicClient.chain?.name)
-    
-    console.log('📋 CONTRACT ADDRESSES:')
-    console.log('- RegistrarController:', BASE_ENS_ADDRESSES.registrarController)
-    console.log('- Registry:', BASE_ENS_ADDRESSES.registry)
-    console.log('- BaseRegistrar:', BASE_ENS_ADDRESSES.baseRegistrar)
-    console.log('- L2Resolver:', BASENAME_L2_RESOLVER_ADDRESS)
 
     if (!isValidBasename(formattedName)) {
       throw new Error('Invalid basename')
@@ -131,24 +115,19 @@ export function useENS() {
 
     try {
       // Check availability
-      console.log('🔍 Checking availability...')
       const available = await checkAvailability(formattedName)
-      console.log('- Available:', available)
       if (!available) {
         throw new Error('Name not available')
       }
 
       // Get price
-      console.log('💰 Getting price...')
       const price = await getRegistrationPrice(formattedName, duration)
-      console.log('- Price:', price?.toString())
       if (!price) {
         throw new Error('Could not determine price')
       }
 
       // Prepare resolver data to set address and AI context during registration
       const node = namehash(`${formattedName}.basetest.eth`)
-      console.log('📊 Setting address and AI context for node:', node)
       
       const setAddrData = encodeFunctionData({
         abi: ENS_RESOLVER_ABI,
@@ -156,12 +135,10 @@ export function useENS() {
         args: [node, address],
       })
       
-      console.log('📊 setAddr data:', setAddrData)
       
       // Prepare AI context text records
       const ensRecords = formatAIContextForENS(aiContext)
       const textRecordData = Object.entries(ensRecords).map(([key, value]) => {
-        console.log(`📊 Adding text record: ${key} = ${value}`)
         return encodeFunctionData({
           abi: ENS_RESOLVER_ABI,
           functionName: 'setText',
@@ -169,7 +146,6 @@ export function useENS() {
         })
       })
       
-      console.log('📊 Total text records to set:', textRecordData.length)
 
       // Create registration request
       const registerRequest = {
@@ -181,15 +157,6 @@ export function useENS() {
         reverseRecord: true,
       }
       
-      console.log('📝 REGISTRATION REQUEST:')
-      console.log('- Name:', registerRequest.name)
-      console.log('- Owner:', registerRequest.owner)
-      console.log('- Duration:', registerRequest.duration.toString())
-      console.log('- Resolver:', registerRequest.resolver)
-      console.log('- Data length:', registerRequest.data.length)
-      console.log('- Reverse record:', registerRequest.reverseRecord)
-
-      console.log('🚀 SENDING REGISTRATION TRANSACTION...')
       const hash = await walletClient.writeContract({
         address: BASE_ENS_ADDRESSES.registrarController,
         abi: REGISTRAR_CONTROLLER_ABI,
@@ -198,15 +165,8 @@ export function useENS() {
         value: price,
       })
       
-      console.log('📋 TRANSACTION SENT:')
-      console.log('- Hash:', hash)
-      console.log('- Check on BaseScan:', `https://sepolia.basescan.org/tx/${hash}`)
 
       const receipt = await publicClient.waitForTransactionReceipt({ hash })
-      console.log('✅ TRANSACTION CONFIRMED:')
-      console.log('- Block:', receipt.blockNumber?.toString())
-      console.log('- Gas used:', receipt.gasUsed?.toString())
-      console.log('- Status:', receipt.status)
       
       setRegistrationStatus(prev => ({ ...prev, isLoading: false }))
       
@@ -220,7 +180,6 @@ export function useENS() {
         message: `✅ Registration complete with ${textRecordData.length} AI context records! Check BaseScan: https://sepolia.basescan.org/tx/${hash}`
       }
     } catch (error) {
-      console.error('❌ REGISTRATION ERROR:', error)
       setRegistrationStatus(prev => ({
         ...prev,
         isLoading: false,
@@ -261,7 +220,6 @@ export function useENS() {
 
       return { success: true, transactionHash: hash }
     } catch (error) {
-      console.error('Update AI context error:', error)
       throw error
     }
   }, [walletClient, address, publicClient])
@@ -273,8 +231,6 @@ export function useENS() {
       const node = namehash(baseName)
       const keys = ['ai.bio', 'ai.style', 'ai.topics', 'ai.traits', 'ai.updated', 'ai.version']
       
-      console.log('Reading AI context for:', baseName)
-      console.log('Node hash:', node)
       
       const records: Record<string, string> = {}
       
@@ -287,17 +243,13 @@ export function useENS() {
             args: [node, key],
           })
           records[key] = value as string
-          console.log(`Read ${key}:`, value)
         } catch (error) {
-          console.warn(`Failed to read ${key}:`, error)
           records[key] = ''
         }
       }
 
-      console.log('All records read:', records)
       return records
     } catch (error) {
-      console.error('Error reading AI context:', error)
       return null
     }
   }, [publicClient])
@@ -308,7 +260,6 @@ export function useENS() {
     
     // Check if any meaningful records exist
     const hasRecords = Object.values(records).some(value => value && value.trim() !== '')
-    console.log('Text records verification:', { baseName, hasRecords, records })
     return hasRecords
   }, [readAIContext])
 
@@ -329,7 +280,6 @@ export function useENS() {
       
       return names
     } catch (error) {
-      console.error('Error fetching ENS names:', error)
       return []
     }
   }, [address])

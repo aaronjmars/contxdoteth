@@ -115,7 +115,6 @@ async function tryMultipleRPCs<T>(
       const result = await operation(client)
       return result
     } catch (error) {
-      console.log(`❌ RPC ${i + 1} failed:`, error instanceof Error ? error.message : error)
       
       if (i === Math.min(maxRetries, BASE_RPC_URLS.length) - 1) {
         throw error
@@ -160,7 +159,6 @@ export default function ENSRecordsDisplay({ userDomain }: ENSRecordsDisplayProps
     
     try {
       const username = userDomain.replace('.contx.eth', '')
-      console.log(`🔍 Fetching records for ${username}.contx.eth...`)
       
       // First check if the username exists
       let userExists = false
@@ -209,11 +207,9 @@ export default function ENSRecordsDisplay({ userDomain }: ENSRecordsDisplayProps
         }
       }
       
-      console.log(`✅ Successfully retrieved records for ${userDomain}:`, existingRecords)
       setRecords(existingRecords)
       
     } catch (error) {
-      console.error('❌ Error fetching records:', error)
       setError(error instanceof Error ? error.message : 'Failed to fetch records')
     } finally {
       setLoading(false)
@@ -247,7 +243,6 @@ export default function ENSRecordsDisplay({ userDomain }: ENSRecordsDisplayProps
       setEditingRecords([])
       
     } catch (error) {
-      console.error('❌ Error updating record:', error)
       setError(error instanceof Error ? error.message : 'Failed to update record')
     } finally {
       setUpdateLoading(false)
@@ -346,7 +341,6 @@ export default function ENSRecordsDisplay({ userDomain }: ENSRecordsDisplayProps
                   setAddressCopied(true)
                   setTimeout(() => setAddressCopied(false), 2000)
                 } catch (err) {
-                  console.error('Failed to copy address:', err)
                 }
               }
             }}

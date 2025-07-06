@@ -98,7 +98,6 @@ export default function RegistrationFlow({ onSuccess }: RegistrationFlowProps) {
       setRegistrationState({ status: 'checking', message: 'Checking availability...' })
       
       try {
-        console.log(`🔍 Checking availability for ${username}.contx.eth...`)
         
         let available = true
         let existingAddress = '0x0000000000000000000000000000000000000000'
@@ -117,12 +116,10 @@ export default function RegistrationFlow({ onSuccess }: RegistrationFlowProps) {
           
         } catch (contractError) {
           // If contract call fails (username doesn't exist), it's available
-          console.log(`📋 Contract call failed (username likely doesn't exist): ${contractError}`)
           available = true
           existingAddress = '0x0000000000000000000000000000000000000000'
         }
         
-        console.log(`📋 Username ${username}: ${available ? 'Available' : 'Taken'} (owner: ${existingAddress})`)
         
         setIsAvailable(available)
         setRegistrationState({
@@ -130,7 +127,6 @@ export default function RegistrationFlow({ onSuccess }: RegistrationFlowProps) {
           message: available ? `${username}.contx.eth is available!` : `${username}.contx.eth is taken`
         })
       } catch (error) {
-        console.error('❌ Availability check error:', error)
         setRegistrationState({
           status: 'error',
           message: 'Failed to check availability - please try again'
@@ -217,7 +213,6 @@ export default function RegistrationFlow({ onSuccess }: RegistrationFlowProps) {
         args: [username, displayName, bio]
       })
       
-      console.log(`📤 Registration transaction sent: ${registerHash}`)
       setRegistrationState({ status: 'registering', message: `Transaction sent, waiting for confirmation...` })
       
       const registerReceipt = await publicClient.waitForTransactionReceipt({ hash: registerHash })
@@ -253,7 +248,6 @@ export default function RegistrationFlow({ onSuccess }: RegistrationFlowProps) {
       }
       
     } catch (error) {
-      console.error('Registration error:', error)
       setRegistrationState({
         status: 'error',
         message: error instanceof Error ? error.message : 'Registration failed'
@@ -385,7 +379,6 @@ export default function RegistrationFlow({ onSuccess }: RegistrationFlowProps) {
                   setAddressCopied(true)
                   setTimeout(() => setAddressCopied(false), 2000)
                 } catch (err) {
-                  console.error('Failed to copy address:', err)
                 }
               }
             }}

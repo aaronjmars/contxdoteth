@@ -1,7 +1,10 @@
-# 🧠 ENS AI Profiles - contx.eth
+# 🧠 The context layer of Ethereum - contx.eth
 
-The context layer of Ethereum
-Transform your X profile into an AI-aware .contx.eth identity in 30 seconds
+Transform your X profile into an AI-aware .contx.eth identity in 30 seconds.
+
+![Preview](public/preview.png)
+![Preview 2](public/preview2.png)
+![Preview 3](public/preview3.png)
 
 ## ✨ What is contx.eth?
 

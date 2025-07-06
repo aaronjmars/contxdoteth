@@ -127,7 +127,7 @@ export default function WalletConnect() {
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-sm text-gray-600">Connected via:</span>
                 <span className="text-sm font-medium capitalize">
-                  {user.linkedAccounts?.[0]?.type || 'Wallet'}
+                  {user.linkedAccounts?.[0]?.type === 'twitter_oauth' ? 'Twitter' : 'Wallet'}
                 </span>
               </div>
             )}

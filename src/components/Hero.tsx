@@ -18,11 +18,20 @@ export function Hero() {
 
   const handleGetStarted = () => {
     if (authenticated) {
+      // Always go to dashboard when authenticated
+      // The dashboard will handle checking for Twitter connection
       router.push('/dashboard')
     } else {
       login()
     }
   }
+  
+  // Auto-redirect to dashboard if user logs in (including Twitter login)
+  useEffect(() => {
+    if (authenticated && ready) {
+      router.push('/dashboard')
+    }
+  }, [authenticated, ready, router])
 
   return (
     <section id="home" className="relative overflow-hidden min-h-screen">

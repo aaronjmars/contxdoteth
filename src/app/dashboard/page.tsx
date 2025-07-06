@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { usePrivy } from '@privy-io/react-auth'
 import { useAccount, usePublicClient, useWalletClient } from 'wagmi'
@@ -16,9 +16,12 @@ import {
   Loader2,
   Search,
   FileText,
-  ExternalLink 
+  ExternalLink,
+  AtSign
 } from 'lucide-react'
 import { InteractiveHoverButton } from '@/components/ui/interactive-hover-button'
+import TwitterConnectionScreen from '@/components/TwitterConnectionScreen'
+import { useTwitterConnection } from '@/lib/hooks/useTwitterConnection'
 
 // Contract ABIs for custom namespace
 const CONTX_REGISTRY_ABI = [
@@ -105,6 +108,11 @@ export default function DashboardNew() {
   const { isConnected } = useAccount()
   const publicClient = usePublicClient()
   const { data: walletClient } = useWalletClient()
+  const { needsTwitterConnection } = useTwitterConnection()
+  
+  // Get Twitter username
+  const twitterAccount = user?.linkedAccounts?.find(account => account.type === 'twitter_oauth')
+  const twitterUsername = twitterAccount?.username
   
   // Basename registration (existing)
   // const [_username, _setUsername] = useState('')
@@ -448,6 +456,11 @@ export default function DashboardNew() {
     )
   }
 
+  // Show Twitter connection requirement screen if not connected
+  if (authenticated && needsTwitterConnection) {
+    return <TwitterConnectionScreen />
+  }
+
   if (registrationComplete) {
     return (
       <section className="relative overflow-hidden min-h-screen">
@@ -463,17 +476,30 @@ export default function DashboardNew() {
                   Home
                 </button>
                 
-                {/* Top Right Wallet Button */}
+                {/* Top Right Account Info */}
                 <div className="absolute top-6 right-6 z-30">
                   <div className="flex items-center gap-2">
+                    {/* Twitter Handle */}
+                    {twitterUsername && (
+                      <button className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-full transition-colors">
+                        <AtSign className="w-4 h-4 text-blue-600" />
+                        <span className="text-blue-700 font-medium">
+                          {twitterUsername}
+                        </span>
+                      </button>
+                    )}
+                    
+                    {/* Wallet Address */}
                     <button
                       className="flex items-center gap-2 px-4 py-2 text-sm bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-full transition-colors"
                     >
-                      <User className="w-4 h-4 text-primary" />
+                      <Wallet className="w-4 h-4 text-primary" />
                       <span className="text-primary">
                         {user?.wallet?.address?.slice(0, 6)}...{user?.wallet?.address?.slice(-4)}
                       </span>
                     </button>
+                    
+                    {/* Logout */}
                     <button
                       onClick={logout}
                       className="flex items-center gap-1 px-3 py-2 text-xs bg-background/50 hover:bg-background/80 border border-primary/20 rounded-full transition-colors"
@@ -563,12 +589,25 @@ export default function DashboardNew() {
               </button>
             ) : (
               <>
+                {/* Twitter Handle */}
+                {twitterUsername && (
+                  <button className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-full transition-colors">
+                    <AtSign className="w-4 h-4 text-blue-600" />
+                    <span className="text-blue-700 font-medium">
+                      {twitterUsername}
+                    </span>
+                  </button>
+                )}
+                
+                {/* Wallet Address */}
                 <button className="flex items-center gap-2 px-4 py-2 text-sm bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-full transition-colors">
-                  <User className="w-4 h-4 text-primary" />
+                  <Wallet className="w-4 h-4 text-primary" />
                   <span className="text-primary">
                     {user?.wallet?.address?.slice(0, 6)}...{user?.wallet?.address?.slice(-4)}
                   </span>
                 </button>
+                
+                {/* Logout */}
                 <button
                   onClick={logout}
                   className="flex items-center gap-1 px-3 py-2 text-xs bg-background/50 hover:bg-background/80 border border-primary/20 rounded-full transition-colors"
@@ -591,6 +630,7 @@ export default function DashboardNew() {
             </div>
           </div>
         )}
+
 
         {/* 4-Function Grid */}
         <div className="grid grid-cols-2 gap-4 max-w-2xl mx-auto">

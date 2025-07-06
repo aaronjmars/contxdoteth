@@ -340,7 +340,7 @@ export default function ENSRecordsDisplay({ userDomain }: ENSRecordsDisplayProps
                   await navigator.clipboard.writeText(user.wallet.address)
                   setAddressCopied(true)
                   setTimeout(() => setAddressCopied(false), 2000)
-                } catch (err) {
+                } catch {
                 }
               }
             }}

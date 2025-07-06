@@ -83,7 +83,7 @@ export default function Dashboard() {
         
         setUserDomain(foundDomain)
         
-      } catch (error) {
+      } catch {
       } finally {
         setCheckingDomain(false)
       }

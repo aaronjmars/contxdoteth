@@ -114,7 +114,7 @@ export default function RegistrationFlow({ onSuccess }: RegistrationFlowProps) {
           // If address is not 0x0, username is taken
           available = existingAddress === '0x0000000000000000000000000000000000000000'
           
-        } catch (contractError) {
+        } catch {
           // If contract call fails (username doesn't exist), it's available
           available = true
           existingAddress = '0x0000000000000000000000000000000000000000'
@@ -126,7 +126,7 @@ export default function RegistrationFlow({ onSuccess }: RegistrationFlowProps) {
           status: 'idle',
           message: available ? `${username}.contx.eth is available!` : `${username}.contx.eth is taken`
         })
-      } catch (error) {
+      } catch {
         setRegistrationState({
           status: 'error',
           message: 'Failed to check availability - please try again'
@@ -378,7 +378,7 @@ export default function RegistrationFlow({ onSuccess }: RegistrationFlowProps) {
                   await navigator.clipboard.writeText(user.wallet.address)
                   setAddressCopied(true)
                   setTimeout(() => setAddressCopied(false), 2000)
-                } catch (err) {
+                } catch {
                 }
               }
             }}

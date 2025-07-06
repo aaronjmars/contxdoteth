@@ -67,7 +67,7 @@ export function useENS() {
       }))
 
       return available as boolean
-    } catch (error) {
+    } catch {
       setRegistrationStatus(prev => ({
         ...prev,
         isLoading: false,
@@ -93,7 +93,7 @@ export function useENS() {
 
       setRegistrationStatus(prev => ({ ...prev, price }))
       return price
-    } catch (error) {
+    } catch {
       return null
     }
   }, [publicClient])
@@ -243,13 +243,13 @@ export function useENS() {
             args: [node, key],
           })
           records[key] = value as string
-        } catch (error) {
+        } catch {
           records[key] = ''
         }
       }
 
       return records
-    } catch (error) {
+    } catch {
       return null
     }
   }, [publicClient])
@@ -279,7 +279,7 @@ export function useENS() {
       // For now, we'll just return mainnet ENS names
       
       return names
-    } catch (error) {
+    } catch {
       return []
     }
   }, [address])

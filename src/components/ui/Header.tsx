@@ -1,13 +1,17 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { usePrivy } from '@privy-io/react-auth'
 import { InteractiveHoverButton } from "@/components/ui/interactive-hover-button"
 import { AnimatedLogo } from "@/components/ui/animated-logo"
 
 export default function Header() {
   const router = useRouter()
+  const pathname = usePathname()
   const { ready, authenticated, login } = usePrivy()
+  
+  // Don't show dashboard button when already on dashboard
+  const isOnDashboard = pathname === '/dashboard'
 
   const handleClaim = () => {
     if (authenticated) {
@@ -28,12 +32,14 @@ export default function Header() {
 
           {/* Right: Claim Button */}
           <div className="flex-shrink-0">
-            <InteractiveHoverButton 
-              text={authenticated ? 'Dashboard' : 'Discover'}
-              onClick={handleClaim}
-              disabled={!ready}
-              className="bg-primary text-primary-foreground border-primary text-sm px-6 py-2"
-            />
+            {!isOnDashboard && (
+              <InteractiveHoverButton 
+                text={authenticated ? 'Dashboard' : 'Discover'}
+                onClick={handleClaim}
+                disabled={!ready}
+                className="bg-primary text-primary-foreground border-primary text-sm px-6 py-2"
+              />
+            )}
           </div>
         </div>
       </div>

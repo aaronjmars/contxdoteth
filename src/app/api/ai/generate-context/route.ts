@@ -148,7 +148,7 @@ async function analyzeTwitterProfile(tweets: Tweet[], userProfile: TwitterProfil
   console.log(`📝 Total tweet text length: ${tweetTexts.length} characters`)
   
   const prompt = `
-Analyze this Twitter profile and tweets to generate content for ENS profile fields:
+You are an expert at analyzing Twitter profiles to create rich, personalized AI personas for Web3 identities. Analyze this person's tweets and profile to generate engaging, authentic content that captures their unique voice and personality.
 
 USER PROFILE:
 - Name: ${userProfile.name}
@@ -160,38 +160,44 @@ USER PROFILE:
 RECENT TWEETS (${tweets.length} tweets):
 ${tweetTexts}
 
-Generate a JSON response that fills these specific ENS profile fields:
+Create a rich, personalized JSON response with these fields:
+
 {
-  "name": "Display name for the profile",
-  "bio": "Concise bio paragraph (50-100 words)",
-  "lore": "Backstory or origin story (30-50 words)",
-  "messageExamples": "JSON array of 3-5 example messages they might send",
-  "postExamples": "JSON array of 3-5 example posts/tweets they might make",
-  "adjectives": "JSON array of 5-8 descriptive adjectives",
-  "topics": "JSON array of main topics/interests (5-8 items)",
-  "style": "JSON object describing communication style",
-  "knowledge": "JSON array of areas of expertise/knowledge",
-  "avatar": "URL to profile picture if available, or empty string",
-  "description": "One-line tagline or description"
+  "name": "Their preferred display name or handle",
+  "bio": "A compelling 2-3 sentence bio that captures their essence, interests, and personality in an engaging way",
+  "lore": "An intriguing 1-2 sentence origin story about how they got into their current path/interests",
+  "messageExamples": ["array", "of", "5", "realistic", "conversational messages they'd send - capture their actual tone, humor, and way of speaking"],
+  "postExamples": ["array", "of", "5", "tweets in their authentic voice - include their interests, humor, and communication style"],
+  "adjectives": ["8", "specific", "personality", "traits", "evident", "from", "their", "content"],
+  "topics": ["6-8", "specific", "interests", "and", "expertise", "areas", "from", "their", "tweets"],
+  "style": {
+    "tone": "specific description of their communication tone",
+    "humor": "type of humor they use (if any)",
+    "technicality": "how technical vs casual they are",
+    "engagement": "how they interact with others",
+    "personality": "key personality traits in communication"
+  },
+  "knowledge": ["specific", "areas", "of", "expertise", "and", "experience", "shown", "in", "tweets"],
+  "avatar": "${userProfile.profilePicture || ''}",
+  "description": "A catchy, unique one-liner that captures their vibe and expertise"
 }
 
-Guidelines:
-- name: Use their actual name or handle
-- bio: Engaging paragraph about who they are and what they do
-- lore: Brief origin story or how they got into their field
-- messageExamples: Realistic DMs/messages they might send (conversational)
-- postExamples: Realistic tweets/posts in their voice
-- adjectives: Personality traits evident from their content
-- topics: Main interests (prefer: web3, ai, development, base, ens, crypto, design, community)
-- style: Communication patterns and tone
-- knowledge: Areas of expertise
-- avatar: Their profile picture URL or empty string
-- description: Catchy one-liner
+INSTRUCTIONS:
+1. ANALYZE DEEPLY: Look for patterns in their language, interests, humor, technical depth, and interaction style
+2. BE SPECIFIC: Avoid generic terms like "innovative" or "passionate" - find unique traits
+3. CAPTURE VOICE: The messageExamples and postExamples should sound like they actually wrote them
+4. SHOW EXPERTISE: Identify their actual knowledge areas from the content, not just general tech terms
+5. BE ENGAGING: Make the bio and description compelling and memorable
+6. STAY AUTHENTIC: Base everything on evidence from their actual tweets and profile
 
-Focus on Web3, crypto, AI, and technology themes when relevant.
-Make content engaging and authentic to their voice.
-Respond with valid JSON only.
-`
+Focus on what makes THIS person unique. Look for:
+- Their specific interests and expertise
+- How they communicate (formal/casual, funny/serious, technical/accessible)
+- What they care about and post about most
+- Their personality quirks and communication patterns
+- Their role in communities (builder, commentator, connector, etc.)
+
+Return ONLY valid JSON with no extra text.`
 
   try {
     console.log(`🧠 Calling OpenAI GPT-4o...`)
@@ -200,15 +206,15 @@ Respond with valid JSON only.
       messages: [
         {
           role: "system",
-          content: "You are an expert at analyzing social media profiles to extract personality traits, interests, and communication styles for Web3/crypto/AI communities. Return only valid JSON."
+          content: "You are a world-class AI persona creator who specializes in analyzing Twitter profiles to build rich, authentic digital identities for Web3 communities. You excel at capturing unique voices, specific expertise, and personality quirks to create compelling AI personas that feel genuinely human. You always return detailed, engaging content based on deep analysis of communication patterns."
         },
         {
           role: "user",
           content: prompt
         }
       ],
-      temperature: 0.3,
-      max_tokens: 1000
+      temperature: 0.7,
+      max_tokens: 1500
     })
 
     console.log(`✅ OpenAI response received`)

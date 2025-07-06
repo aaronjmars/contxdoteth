@@ -3,14 +3,6 @@ const nextConfig = {
   images: {
     domains: ['pbs.twimg.com'], // For Twitter avatars
   },
-  compiler: {
-    styledComponents: {
-      displayName: true,
-      ssr: true,
-      fileName: true,
-    },
-  },
-  // Suppress styled-components warnings from third-party libraries
   webpack: (config: any, { isServer }: { isServer: boolean }) => {
     if (!isServer) {
       config.resolve.fallback = {

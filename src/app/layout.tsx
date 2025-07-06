@@ -1,7 +1,6 @@
 import './globals.css'
 import { Inter } from 'next/font/google'
 import { PrivyProvider } from '@/providers/PrivyProvider'
-import StyledComponentsRegistry from '@/lib/registry'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -23,11 +22,9 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <StyledComponentsRegistry>
-          <PrivyProvider>
-            {children}
-          </PrivyProvider>
-        </StyledComponentsRegistry>
+        <PrivyProvider>
+          {children}
+        </PrivyProvider>
       </body>
     </html>
   )

@@ -101,19 +101,11 @@ interface RegistrationState {
   txHash?: string
 }
 
-// Create public client with failover RPC support
-function createPublicClientWithFailover() {
-  const { createPublicClient, http } = require('viem')
-  const { base } = require('viem/chains')
-  
-  return createPublicClient({
-    chain: base,
-    transport: http(BASE_RPC_URLS[0]), // Start with primary RPC
-  })
-}
+// RPC failover utility for contract operations
 
 // Utility function to try multiple RPC endpoints for contract reads
 async function tryMultipleRPCs<T>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   operation: (client: any) => Promise<T>,
   maxRetries: number = BASE_RPC_URLS.length
 ): Promise<T> {
@@ -377,7 +369,7 @@ export default function Dashboard() {
       // Prepare all records for batch update
       const allRecords = Object.entries(registrationResult.ensRecords)
       const keys = allRecords.map(([key]) => key)
-      const values = allRecords.map(([, value]) => value)
+      const values = allRecords.map(([, value]) => String(value))
       
       console.log(`📝 Setting ${allRecords.length} text records using updateFields...`)
       console.log(`📋 Keys: ${keys.join(', ')}`)
@@ -474,7 +466,7 @@ export default function Dashboard() {
                 args: [username, key]
               })
               console.log(`✅ Verification - ${key}: ${storedValue ? 'STORED' : 'EMPTY'} (length: ${storedValue?.length || 0})`)
-            } catch (verifyError) {
+            } catch {
               console.log(`❌ Verification - ${key}: FAILED to read back`)
             }
           }
@@ -533,7 +525,7 @@ export default function Dashboard() {
         })
         userExists = address !== '0x0000000000000000000000000000000000000000'
         console.log(`📋 Username ${viewRecordsUsername} exists: ${userExists} (address: ${address})`)
-      } catch (error) {
+      } catch {
         console.log(`📋 Username ${viewRecordsUsername} does not exist`)
         userExists = false
       }
@@ -593,7 +585,7 @@ export default function Dashboard() {
             existingFields.push(field)
             console.log(`✅ Found field: ${field} (${value.length} chars)`)
           }
-        } catch (fieldError) {
+        } catch {
           // Field doesn't exist or is empty, skip it
           console.log(`⚠️ Field ${field} failed or empty`)
         }
@@ -613,7 +605,7 @@ export default function Dashboard() {
       
       try {
         // Try batch getFields first with RPC failover
-        fieldValues = await tryMultipleRPCs(async (client) => {
+        const batchResults = await tryMultipleRPCs(async (client) => {
           return await client.readContract({
             address: CONTX_REGISTRY_ADDRESS,
             abi: CONTX_REGISTRY_ABI,
@@ -621,8 +613,9 @@ export default function Dashboard() {
             args: [viewRecordsUsername, fieldNames]
           })
         })
+        fieldValues = Array.from(batchResults)
         console.log(`📋 Retrieved ${fieldValues.length} field values via getFields`)
-      } catch (error) {
+      } catch {
         console.log('⚠️ getFields failed, getting values individually...')
         
         // Fallback: Get each field value individually with RPC failover
@@ -638,7 +631,7 @@ export default function Dashboard() {
               })
             })
             fieldValues.push(value || '')
-          } catch (fieldError) {
+          } catch {
             fieldValues.push('')
           }
         }
@@ -687,7 +680,7 @@ export default function Dashboard() {
           return
         }
         console.log(`📋 Username ${updateUsername} exists (address: ${address})`)
-      } catch (error) {
+      } catch {
         setUpdateResult(`❌ ${updateUsername}.contx.eth is not registered`)
         return
       }
@@ -718,7 +711,7 @@ export default function Dashboard() {
           })
           console.log(`✅ Verification: ${updateKey} = ${newValue}`)
           setUpdateResult(`✅ Successfully updated ${updateKey} for ${updateUsername}.contx.eth`)
-        } catch (verifyError) {
+        } catch {
           console.log('⚠️ Could not verify update')
           setUpdateResult(`✅ Update transaction successful: ${updateHash}`)
         }

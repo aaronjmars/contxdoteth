@@ -50,102 +50,107 @@ interface AIContextResponse {
   description: string
 }
 
-// Helper function to fetch tweets with pagination
-async function fetchAllTweets(userName: string, maxTweets = 50): Promise<Tweet[]> {
-  console.log(`📡 fetchAllTweets: Starting for @${userName}, max: ${maxTweets}`)
+// Helper function to fetch tweets with pagination - optimized for minimal data
+async function fetchAllTweets(userName: string, maxTweets = 100): Promise<Tweet[]> {
+  console.log(`🐦 Fetching tweets for @${userName}...`)
   
   let allTweets: Tweet[] = []
   let cursor = ''
   let hasNextPage = true
   let pageCount = 0
   
-  while (hasNextPage && allTweets.length < maxTweets) {
+  while (hasNextPage && allTweets.length < maxTweets && pageCount < 8) {
     pageCount++
-    console.log(`📄 Fetching page ${pageCount}...`)
     
     try {
       const url = new URL('https://api.twitterapi.io/twitter/user/last_tweets')
       url.searchParams.append('userName', userName)
       url.searchParams.append('includeReplies', 'false')
-      if (cursor) {
-        url.searchParams.append('cursor', cursor)
-        console.log(`🔄 Using cursor: ${cursor.substring(0, 20)}...`)
-      }
+      if (cursor) url.searchParams.append('cursor', cursor)
 
-      console.log(`🌐 Calling Twitter API: ${url.toString()}`)
-
-      const options = {
+      const response = await fetch(url.toString(), {
         method: 'GET',
-        headers: {
-          'X-API-Key': TWITTER_API_KEY!
-        }
-      }
-
-      const response = await fetch(url.toString(), options)
-      console.log(`📡 Twitter API Response: ${response.status} ${response.statusText}`)
+        headers: { 'X-API-Key': TWITTER_API_KEY! }
+      })
       
       const data = await response.json()
-      console.log(`📋 Response data keys: ${Object.keys(data).join(', ')}`)
-      
-      // Debug: Log the actual response structure
-      console.log('🔍 Full response structure:', JSON.stringify(data, null, 2))
 
       if (data.status !== 'success') {
-        console.error(`❌ Twitter API error: ${data.msg || data.message || 'Unknown error'}`)
-        console.error('Full response:', JSON.stringify(data, null, 2))
-        throw new Error(`Twitter API error: ${data.msg || data.message || 'Unknown error'}`)
+        throw new Error(`Twitter API error: ${data.msg || 'Unknown error'}`)
       }
 
-      // The API returns tweets in data.data.tweets array
       const tweets = data.data?.tweets || []
       
-      // Add tweets to collection (filter out replies)
       if (tweets && tweets.length > 0) {
-        const nonReplyTweets = tweets.filter((tweet: Tweet & { isReply?: boolean }) => !tweet.isReply)
-        console.log(`📝 Found ${tweets.length} tweets (${nonReplyTweets.length} non-replies) in this page`)
-        allTweets.push(...nonReplyTweets)
+        // Only extract essential data - allow some replies if they're substantial, minimal structure
+        const simplifiedTweets = tweets
+          .filter((tweet: unknown) => {
+            const t = tweet as { text?: string; isReply?: boolean }
+            return t.text && t.text.length > 15 && !t.text.startsWith('@')
+          })
+          .map((tweet: unknown) => {
+            const t = tweet as {
+              text: string
+              createdAt: string
+              author: {
+                name: string
+                userName: string
+                followers: number
+                following: number
+                statusesCount: number
+                createdAt: string
+                isVerified: boolean
+                location?: string
+                profilePicture?: string
+                profile_bio?: { description: string }
+              }
+            }
+            return {
+              text: t.text,
+              createdAt: t.createdAt,
+              author: {
+                name: t.author.name,
+                userName: t.author.userName,
+                followers: t.author.followers,
+                following: t.author.following,
+                statusesCount: t.author.statusesCount,
+                createdAt: t.author.createdAt,
+                isVerified: t.author.isVerified,
+                location: t.author.location || '',
+                profilePicture: t.author.profilePicture || '',
+                profile_bio: t.author.profile_bio
+              }
+            }
+          })
         
-        // Sort by creation date (newest first)
-        allTweets.sort((a: Tweet, b: Tweet) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        allTweets.push(...simplifiedTweets)
         
-        // Trim to max tweets if exceeded
-        if (allTweets.length > maxTweets) {
+        if (allTweets.length >= maxTweets) {
           allTweets = allTweets.slice(0, maxTweets)
-          console.log(`✂️ Trimmed to ${maxTweets} tweets`)
           break
         }
-      } else {
-        console.log(`📭 No tweets found in this page`)
       }
 
-      // Check for next page
-      hasNextPage = data.has_next_page
+      hasNextPage = data.has_next_page && pageCount < 8
       cursor = data.next_cursor || ''
       
-      console.log(`📊 Total tweets so far: ${allTweets.length}`)
-      console.log(`🔄 Has next page: ${hasNextPage}`)
-
-      // Add delay to respect rate limits
-      console.log('⏳ Waiting 100ms for rate limiting...')
       await new Promise(resolve => setTimeout(resolve, 100))
 
     } catch (error) {
-      console.error('💥 Error fetching tweets:', error)
+      console.error('Error fetching tweets:', error)
       throw error
     }
   }
 
-  console.log(`✅ fetchAllTweets completed: ${allTweets.length} tweets total`)
+  console.log(`✅ Fetched ${allTweets.length} tweets`)
   return allTweets
 }
 
 // Helper function to analyze tweets with GPT-4o
 async function analyzeTwitterProfile(tweets: Tweet[], userProfile: TwitterProfile): Promise<AIContextResponse> {
-  console.log(`🤖 analyzeTwitterProfile: Starting analysis...`)
-  console.log(`📊 Input: ${tweets.length} tweets, user: ${userProfile.name}`)
+  console.log(`🤖 Analyzing ${tweets.length} tweets for ${userProfile.name}...`)
   
   const tweetTexts = tweets.map(tweet => tweet.text).join('\n\n')
-  console.log(`📝 Total tweet text length: ${tweetTexts.length} characters`)
   
   const prompt = `
 You are an expert at analyzing Twitter profiles to create rich, personalized AI personas for Web3 identities. Analyze this person's tweets and profile to generate engaging, authentic content that captures their unique voice and personality.
@@ -200,7 +205,14 @@ Focus on what makes THIS person unique. Look for:
 Return ONLY valid JSON with no extra text.`
 
   try {
-    console.log(`🧠 Calling OpenAI GPT-4o...`)
+    if (!process.env.OPENAI_API_KEY) {
+      console.error('❌ OPENAI_API_KEY is missing - falling back to keyword analysis')
+      throw new Error('OpenAI API key not configured')
+    }
+
+    console.log(`🧠 Calling OpenAI with ${tweetTexts.length} chars of tweet data...`)
+    console.log(`🔑 OpenAI key starts with: ${process.env.OPENAI_API_KEY?.substring(0, 7)}...`)
+    
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
@@ -217,18 +229,21 @@ Return ONLY valid JSON with no extra text.`
       max_tokens: 1500
     })
 
-    console.log(`✅ OpenAI response received`)
-    console.log(`📊 Usage: ${completion.usage?.total_tokens} tokens`)
+    let responseContent = completion.choices[0].message.content || '{}'
+    console.log(`🤖 OpenAI raw response: ${responseContent.substring(0, 500)}...`)
     
-    const responseContent = completion.choices[0].message.content || '{}'
-    console.log(`📋 Raw AI response: ${responseContent.substring(0, 200)}...`)
-
-    const analysis = JSON.parse(responseContent)
-    console.log(`✅ JSON parsed successfully`)
-    console.log(`📊 Generated ENS fields:`)
-    console.log(`   Name: ${analysis.name || 'N/A'}`)
-    console.log(`   Bio: ${analysis.bio?.substring(0, 50) || 'N/A'}...`)
-    console.log(`   Topics: ${typeof analysis.topics === 'string' ? analysis.topics : JSON.stringify(analysis.topics)}`)
+    // Strip markdown code blocks if present
+    if (responseContent.trim().startsWith('```json')) {
+      responseContent = responseContent.replace(/```json\s*/, '').replace(/\s*```$/, '')
+      console.log(`🔧 Stripped markdown formatting`)
+    } else if (responseContent.trim().startsWith('```')) {
+      responseContent = responseContent.replace(/```\s*/, '').replace(/\s*```$/, '')
+      console.log(`🔧 Stripped generic markdown formatting`)
+    }
+    
+    const analysis = JSON.parse(responseContent.trim())
+    console.log(`✅ AI analysis complete for ${analysis.name || userProfile.name}`)
+    console.log(`📊 Analysis keys: ${Object.keys(analysis).join(', ')}`)
     
     // Validate and ensure required fields with fallbacks
     const result: AIContextResponse = {
@@ -245,14 +260,12 @@ Return ONLY valid JSON with no extra text.`
       description: analysis.description || `${userProfile.name} on X`
     }
     
-    console.log(`✅ analyzeTwitterProfile completed successfully`)
+    console.log(`✅ Real AI analysis complete`)
     return result
     
   } catch (error) {
-    console.error('💥 Error analyzing with GPT-4o:', error)
-    console.log(`🔄 Falling back to keyword-based analysis...`)
-    
-    // Fallback analysis if OpenAI fails
+    console.error('❌ OpenAI call failed:', error instanceof Error ? error.message : error)
+    console.log('🔄 Falling back to keyword analysis...')
     return generateFallbackAnalysis(tweets, userProfile)
   }
 }
@@ -298,41 +311,27 @@ function generateFallbackAnalysis(tweets: Tweet[], userProfile: TwitterProfile):
 }
 
 export async function POST(request: NextRequest) {
-  console.log('🚀 POST /api/ai/generate-context - Starting...')
+  console.log('🚀 Generating AI context...')
   
   try {
-    console.log('📝 Parsing request body...')
     const { username, twitterUsername } = await request.json()
-    console.log(`📋 Request data: username="${username}", twitterUsername="${twitterUsername}"`)
-
-    // Check environment variables
-    console.log('🔧 Checking environment variables...')
-    console.log(`TWITTER_API_KEY: ${TWITTER_API_KEY ? '✅ Set' : '❌ Missing'}`)
-    console.log(`OPENAI_API_KEY: ${process.env.OPENAI_API_KEY ? '✅ Set' : '❌ Missing'}`)
 
     if (!TWITTER_API_KEY) {
-      console.error('❌ TWITTER_API_KEY environment variable is missing')
       return NextResponse.json({ 
         error: 'Twitter API key is not configured' 
       }, { status: 500 })
     }
 
     if (!twitterUsername) {
-      console.error('❌ Twitter username is required')
       return NextResponse.json({ 
         error: 'Twitter username is required for AI context generation' 
       }, { status: 400 })
     }
-
-    console.log(`🐦 Generating AI context for @${twitterUsername}...`)
     
     // Fetch tweets from Twitter API
-    console.log('📱 Fetching tweets from Twitter API...')
-    const tweets = await fetchAllTweets(twitterUsername, 50)
-    console.log(`📊 Fetched ${tweets.length} tweets`)
+    const tweets = await fetchAllTweets(twitterUsername, 100)
     
     if (tweets.length === 0) {
-      console.error(`❌ No tweets found for @${twitterUsername}`)
       return NextResponse.json({ 
         error: 'No tweets found for this user. Please ensure the username is correct and the account is public.' 
       }, { status: 404 })
@@ -340,65 +339,44 @@ export async function POST(request: NextRequest) {
 
     // Get user profile from first tweet's author data
     const userProfile = tweets[0].author
-    console.log(`👤 User profile: ${userProfile.name} (@${twitterUsername})`)
-    console.log(`📈 Profile stats: ${userProfile.followers} followers, ${userProfile.following} following`)
-    
-    console.log(`🤖 Analyzing ${tweets.length} tweets with AI...`)
     
     // Analyze with GPT-4o (or fallback)
     const analysis = await analyzeTwitterProfile(tweets, userProfile)
-    console.log(`✅ AI analysis complete:`)
-    console.log(`   Name: ${analysis.name}`)
-    console.log(`   Bio: ${analysis.bio?.substring(0, 50)}...`)
-    console.log(`   Lore: ${analysis.lore?.substring(0, 30)}...`)
-    console.log(`   Topics: ${analysis.topics}`)
     
-    // Generate complete AI context using contract field names
-    const aiContext = analysis
-
-    // Generate ENS text records that match the contract's getFieldNames() response
-    const ensRecords = {
-      // Contract's hardcoded fields populated with AI-generated content
-      'name': analysis.name,
-      'bio': analysis.bio,
-      'lore': analysis.lore,
-      'messageExamples': analysis.messageExamples,
-      'postExamples': analysis.postExamples,
-      'adjectives': analysis.adjectives,
-      'topics': analysis.topics,
-      'style': analysis.style,
-      'knowledge': analysis.knowledge,
-      'avatar': analysis.avatar,
-      'description': analysis.description
-    }
-
-    console.log(`📦 Generated ${Object.keys(ensRecords).length} ENS records`)
-    console.log('✅ AI context generation completed successfully')
+    console.log(`✅ Generated AI context for ${analysis.name}`)
 
     return NextResponse.json({
       success: true,
       username,
       twitterUsername,
       tweetsAnalyzed: tweets.length,
-      aiContext,
-      ensRecords,
+      aiContext: analysis,
+      ensRecords: {
+        'name': analysis.name,
+        'bio': analysis.bio,
+        'lore': analysis.lore,
+        'messageExamples': analysis.messageExamples,
+        'postExamples': analysis.postExamples,
+        'adjectives': analysis.adjectives,
+        'topics': analysis.topics,
+        'style': analysis.style,
+        'knowledge': analysis.knowledge,
+        'avatar': analysis.avatar,
+        'description': analysis.description
+      },
       metadata: {
         userProfile: {
           name: userProfile.name,
           followers: userProfile.followers,
           following: userProfile.following,
-          statusesCount: userProfile.statusesCount,
-          createdAt: userProfile.createdAt,
-          verified: userProfile.isVerified,
-          location: userProfile.location
+          verified: userProfile.isVerified
         },
         generatedAt: new Date().toISOString()
       }
     })
 
   } catch (error) {
-    console.error('💥 AI context generation error:', error)
-    console.error('Stack trace:', error instanceof Error ? error.stack : 'No stack trace available')
+    console.error('AI context generation error:', error)
     
     const errorMessage = error instanceof Error ? error.message : 'Failed to generate AI context'
     

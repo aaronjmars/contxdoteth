@@ -10,7 +10,9 @@ import TwitterConnectionScreen from '@/components/TwitterConnectionScreen'
 import RegistrationFlow from '@/components/RegistrationFlow'
 import ENSRecordsDisplay from '@/components/ENSRecordsDisplay'
 import SmartWalletDebug from '@/components/SmartWalletDebug'
+import SmartWalletManager from '@/components/SmartWalletManager'
 import { useTwitterConnection } from '@/lib/hooks/useTwitterConnection'
+import { useSmartWallet } from '@/lib/hooks/useSmartWallet'
 import { DynamicGrid } from '@/components/ui/DynamicGrid'
 
 // Contract ABI for checking existing domains
@@ -32,6 +34,10 @@ function Dashboard() {
   // const { isConnected } = useAccount() // Not used in this component
   const publicClient = usePublicClient()
   const { needsTwitterConnection } = useTwitterConnection()
+  const { hasSmartWallet } = useSmartWallet()
+  
+  // Log smart wallet status for debugging
+  console.log('🎯 Dashboard Smart Wallet Status:', hasSmartWallet)
   
   // State for checking existing domains
   const [userDomain, setUserDomain] = useState<string | null>(null)
@@ -144,7 +150,12 @@ function Dashboard() {
 
   // Show Twitter connection requirement screen if not connected
   if (authenticated && needsTwitterConnection) {
-    return <TwitterConnectionScreen />
+    return (
+      <>
+        <TwitterConnectionScreen />
+        <SmartWalletManager />
+      </>
+    )
   }
 
   // Show loading while checking for existing domain
@@ -170,6 +181,7 @@ function Dashboard() {
     return (
       <>
         <ENSRecordsDisplay userDomain={userDomain} />
+        <SmartWalletManager />
         <SmartWalletDebug />
       </>
     )
@@ -178,6 +190,7 @@ function Dashboard() {
     return (
       <>
         <RegistrationFlow onSuccess={handleSuccessfulRegistration} />
+        <SmartWalletManager />
         <SmartWalletDebug />
       </>
     )

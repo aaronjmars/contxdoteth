@@ -1,6 +1,7 @@
 'use client'
 
 import { PrivyProvider as Privy } from '@privy-io/react-auth'
+import { SmartWalletsProvider } from '@privy-io/react-auth/smart-wallets'
 import { WagmiProvider } from '@privy-io/wagmi'
 import { base } from 'viem/chains'
 import { http } from 'viem'
@@ -48,7 +49,16 @@ export function PrivyProvider({ children }: { children: React.ReactNode }) {
         }}
       >
         <WagmiProvider config={wagmiConfig}>
-          {children}
+          <SmartWalletsProvider
+            config={{
+              paymasterContext: {
+                // Alchemy specific paymaster context if needed
+                policyId: process.env.NEXT_PUBLIC_ALCHEMY_GAS_POLICY_ID,
+              }
+            }}
+          >
+            {children}
+          </SmartWalletsProvider>
         </WagmiProvider>
       </Privy>
     </QueryClientProvider>

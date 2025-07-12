@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { usePrivy } from '@privy-io/react-auth'
 import { useAccount, usePublicClient, useWalletClient } from 'wagmi'
+import { useSmartWallets } from '@privy-io/react-auth/smart-wallets'
 import { Address } from 'viem'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
@@ -73,6 +74,7 @@ export default function RegistrationFlow({ onSuccess }: RegistrationFlowProps) {
   const { isConnected } = useAccount()
   const publicClient = usePublicClient()
   const { data: walletClient } = useWalletClient()
+  const smartWallets = useSmartWallets()
   
   // Get Twitter username
   const twitterAccount = user?.linkedAccounts?.find(account => account.type === 'twitter_oauth')
@@ -148,6 +150,9 @@ export default function RegistrationFlow({ onSuccess }: RegistrationFlowProps) {
       console.log('👤 User info:', user)
       console.log('🔗 Connected wallet:', isConnected)
       console.log('💳 Wallet client type:', walletClient)
+      console.log('🧩 Smart wallets object:', smartWallets)
+      console.log('🎮 Smart wallet client:', smartWallets?.client)
+      console.log('🔧 Smart wallet client available:', !!smartWallets?.client)
       
       // Check for smart wallet vs embedded wallet
       const smartWallet = user?.linkedAccounts?.find(account => account.type === 'smart_wallet')

@@ -1,5 +1,4 @@
 'use client'
-
 import { PrivyProvider as Privy } from '@privy-io/react-auth'
 import { WagmiProvider } from '@privy-io/wagmi'
 import { base } from 'viem/chains'
@@ -18,35 +17,30 @@ const wagmiConfig = createConfig({
 const queryClient = new QueryClient()
 
 export function PrivyProvider({ children }: { children: React.ReactNode }) {
-  // Use a placeholder app ID during build time
   const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID || 'placeholder-for-build'
   
-  // Skip rendering during build if no real app ID
   if (typeof window === 'undefined' && appId === 'placeholder-for-build') {
     return <>{children}</>
   }
   
   return (
     <QueryClientProvider client={queryClient}>
-<Privy
-  appId={appId}
-  config={{
-    appearance: {
-      theme: 'light',
-      accentColor: '#0071e3',
-      logo: 'https://files.readme.io/a0c0c4f-privy-logo-black.svg',
-      walletList: ['coinbase_wallet'], // ✅ Show Coinbase Wallet
-    },
-    externalWallets: {
-      coinbaseWallet: {
-        connectionOptions: 'smartWalletOnly' // ✅ Force smart wallet only
-      }
-    },
-    defaultChain: base,
-    supportedChains: [base],
-    // Remove loginMethods to focus on wallet connection
-  }}
->
+      <Privy
+        appId={appId}
+        config={{
+          appearance: {
+            theme: 'light',
+            accentColor: '#0071e3',
+            logo: 'https://files.readme.io/a0c0c4f-privy-logo-black.svg',
+          },
+          embeddedWallets: {
+            createOnLogin: 'all-users',
+          },
+          defaultChain: base,
+          supportedChains: [base],
+          loginMethods: ['twitter', 'email'],
+        }}
+      >
         <WagmiProvider config={wagmiConfig}>
           {children}
         </WagmiProvider>

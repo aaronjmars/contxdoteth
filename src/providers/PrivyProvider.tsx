@@ -29,29 +29,15 @@ export function PrivyProvider({ children }: { children: React.ReactNode }) {
       <Privy
         appId={appId}
         config={{
-          appearance: {
-            theme: 'light',
-            accentColor: '#0071e3',
-            logo: 'https://files.readme.io/a0c0c4f-privy-logo-black.svg',
-            // Add this to show Coinbase in wallet list if needed
-            walletList: ['coinbase_wallet'], 
-          },
-          embeddedWallets: {
-            createOnLogin: 'all-users', // ✅ This creates embedded wallets
-          },
-          defaultChain: base,
-          supportedChains: [base],
-          
-          // Focus on social logins to get embedded wallets
-          loginMethods: ['twitter', 'email'], // ✅ Removed 'wallet' to avoid external confusion
-          
-          // Remove this entire section for now
-          // externalWallets: {
-          //   coinbaseWallet: {
-          //     connectionOptions: 'smartWalletOnly',
-          //   },
-          // },
-        }}
+  embeddedWallets: {
+    ethereum: {
+      createOnLogin: 'all-users',
+    },
+  },
+  defaultChain: base,
+  supportedChains: [base],
+  loginMethods: ['twitter'],
+}}
       >
         <WagmiProvider config={wagmiConfig}>
           {children}

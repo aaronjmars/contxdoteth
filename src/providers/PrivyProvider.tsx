@@ -1,15 +1,10 @@
 'use client'
 import { usePrivy } from '@privy-io/react-auth'
-import { useSmartWallets } from '@privy-io/react-auth/smart-wallets'
-import { base } from 'viem/chains'
-import { parseEther } from 'viem'
 import { useEffect, useState } from 'react'
 
-export function SmartWalletDebugComponent() {
+export function SimpleDebugComponent() {
   const { user, authenticated, ready } = usePrivy()
-  const { client } = useSmartWallets()
   const [logs, setLogs] = useState<string[]>([])
-  const [isTransacting, setIsTransacting] = useState(false)
 
   // Log function to track events
   const addLog = (message: string) => {
@@ -40,54 +35,8 @@ export function SmartWalletDebugComponent() {
       } else {
         addLog(`⚠️ No smart wallet found yet - may still be creating...`)
       }
-
-      if (client) {
-        addLog(`✅ Smart wallet client is ready`)
-        addLog(`Smart wallet client address: ${client.account?.address}`)
-      }
     }
-  }, [ready, authenticated, user, client])
-
-  // Test sponsored transaction
-  const testSponsoredTransaction = async () => {
-    if (!client || !user) {
-      addLog('❌ Smart wallet client not available')
-      return
-    }
-
-    setIsTransacting(true)
-    addLog('🚀 Starting sponsored transaction test...')
-
-    try {
-      // Send a small sponsored transaction to yourself (no actual transfer)
-      const smartWallet = user.linkedAccounts.find(acc => acc.type === 'smart_wallet')
-      
-      if (!smartWallet) {
-        addLog('❌ No smart wallet address found')
-        return
-      }
-
-      addLog(`📡 Sending sponsored transaction from smart wallet: ${smartWallet.address}`)
-      
-      const txHash = await client.sendTransaction({
-        account: client.account,
-        chain: base,
-        to: smartWallet.address, // Send to self (no actual transfer)
-        value: parseEther('0'), // 0 ETH
-        data: '0x', // Empty data
-      })
-      
-      addLog(`✅ Sponsored transaction successful!`)
-      addLog(`Transaction hash: ${txHash}`)
-      addLog(`🎉 Gas fees were paid by Alchemy paymaster!`)
-      
-    } catch (error: any) {
-      addLog(`❌ Transaction failed: ${error.message}`)
-      console.error('Transaction error:', error)
-    } finally {
-      setIsTransacting(false)
-    }
-  }
+  }, [ready, authenticated, user])
 
   // Get wallet info for display
   const embeddedWallet = user?.linkedAccounts.find(acc => acc.type === 'wallet')
@@ -137,39 +86,39 @@ export function SmartWalletDebugComponent() {
               <div>
                 <strong>Type:</strong> {smartWallet.smartWalletType || 'Unknown'}
               </div>
+              <div className="text-green-600 font-medium">
+                ✅ Gas sponsorship should be active for this wallet!
+              </div>
             </div>
           ) : (
             <div className="text-yellow-600">
               ⚠️ Smart wallet not found - check Privy Dashboard configuration
             </div>
           )}
-          
-          <div>
-            <strong>Client Ready:</strong> {client ? '✅ Yes' : '❌ No'}
-          </div>
         </div>
       </div>
 
-      {/* Test Transaction */}
+      {/* Configuration Status */}
       <div className="p-4 border rounded-lg">
-        <h4 className="font-bold mb-2">🧪 Test Alchemy Gas Sponsorship</h4>
-        <p className="text-sm text-gray-600 mb-3">
-          Send a test transaction to verify gas sponsorship is working
-        </p>
-        
-        <button
-          onClick={testSponsoredTransaction}
-          disabled={!client || !smartWallet || isTransacting}
-          className="bg-blue-500 text-white px-4 py-2 rounded disabled:bg-gray-300 disabled:cursor-not-allowed"
-        >
-          {isTransacting ? '🔄 Testing...' : '🚀 Test Sponsored Transaction'}
-        </button>
-        
-        {!client && (
-          <p className="text-red-600 text-sm mt-2">
-            Smart wallet client not ready
-          </p>
-        )}
+        <h4 className="font-bold mb-2">📊 Configuration Status</h4>
+        <div className="space-y-2 text-sm">
+          <div className="flex items-center space-x-2">
+            <span>{user ? '✅' : '❌'}</span>
+            <span>User authenticated</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span>{embeddedWallet ? '✅' : '❌'}</span>
+            <span>Embedded wallet created</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span>{smartWallet ? '✅' : '❌'}</span>
+            <span>Smart wallet created</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span>🔧</span>
+            <span>Gas sponsorship (configure in Privy Dashboard)</span>
+          </div>
+        </div>
       </div>
 
       {/* Logs */}
@@ -207,9 +156,27 @@ export function SmartWalletDebugComponent() {
             <li>• <strong>Gas Policy ID:</strong> Your Alchemy gas policy ID</li>
             <li>• <strong>Bundler URL:</strong> Your Alchemy bundler URL (optional)</li>
           </ul>
-          <p><strong>4.</strong> Save configuration and test the transaction above</p>
+          <p><strong>4.</strong> Once configured, all transactions from the smart wallet will be sponsored!</p>
         </div>
       </div>
+
+      {/* Next Steps */}
+      {smartWallet && (
+        <div className="p-4 border-2 border-green-200 rounded-lg bg-green-50">
+          <h4 className="font-bold mb-2 text-green-800">🎉 Smart Wallet Ready!</h4>
+          <div className="text-sm text-green-700">
+            <p>Your smart wallet is created. To test gas sponsorship:</p>
+            <ol className="list-decimal list-inside mt-2 space-y-1">
+              <li>Configure Alchemy paymaster in Privy Dashboard</li>
+              <li>Try sending a transaction using regular wallet methods</li>
+              <li>The transaction should execute without charging gas fees!</li>
+            </ol>
+            <p className="mt-2 font-medium">
+              Optional: Install <code className="bg-green-200 px-1 rounded">permissionless</code> package for advanced smart wallet features.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

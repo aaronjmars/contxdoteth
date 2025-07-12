@@ -37,16 +37,14 @@ export function PrivyProvider({ children }: { children: React.ReactNode }) {
             logo: 'https://files.readme.io/a0c0c4f-privy-logo-black.svg',
           },
           embeddedWallets: {
-            createOnLogin: 'all-users',
+            ethereum: {
+              createOnLogin: 'users-without-wallets',
+            },
+            requireUserPasswordOnCreate: false,
           },
           defaultChain: base,
           supportedChains: [base],
-          loginMethods: ['twitter', 'wallet'],
-          externalWallets: {
-            coinbaseWallet: {
-              connectionOptions: 'smartWalletOnly',
-            },
-          },
+          loginMethods: ['twitter'],
         }}
       >
         <WagmiProvider config={wagmiConfig}>

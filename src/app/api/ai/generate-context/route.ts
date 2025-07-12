@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 
-// Initialize OpenAI
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-})
-
 const TWITTER_API_KEY = process.env.TWITTER_API_KEY
 
 interface TwitterProfile {
@@ -212,6 +207,11 @@ Return ONLY valid JSON with no extra text.`
 
     console.log(`🧠 Calling OpenAI with ${tweetTexts.length} chars of tweet data...`)
     console.log(`🔑 OpenAI key starts with: ${process.env.OPENAI_API_KEY?.substring(0, 7)}...`)
+    
+    // Initialize OpenAI client when needed
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY
+    })
     
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",

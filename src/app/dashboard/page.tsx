@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import { usePrivy } from '@privy-io/react-auth'
 import { usePublicClient } from 'wagmi'
 import { Address } from 'viem'
@@ -25,7 +26,7 @@ const CONTX_REGISTRY_ABI = [
 // Contract addresses from environment variables
 const CONTX_REGISTRY_ADDRESS = process.env.NEXT_PUBLIC_BASE_REGISTRY_ADDRESS as Address
 
-export default function Dashboard() {
+function Dashboard() {
   const { ready, authenticated, login, user } = usePrivy()
   // const { isConnected } = useAccount() // Not used in this component
   const publicClient = usePublicClient()
@@ -120,15 +121,15 @@ export default function Dashboard() {
               <div className="relative mx-auto h-full max-w-2xl bg-white border border-primary/20 p-8 rounded-2xl shadow-lg">
                 
                 <div className="pt-8">
-                  <h1 className="text-4xl font-semibold mb-4">Connect Your Wallet</h1>
-                  <p className="text-muted-foreground mb-8">Get started with your AI-enhanced ENS identity</p>
+                  <h1 className="text-4xl font-semibold mb-4">Connect with Twitter</h1>
+                  <p className="text-muted-foreground mb-8">Get started with your AI-enhanced ENS identity using your Twitter account</p>
                   
                   <div className="flex justify-center">
                     <button
                       onClick={login}
                       className="px-8 py-4 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-all hover:scale-105 font-semibold shadow-lg z-50 relative"
                     >
-                      Connect Wallet
+                      Continue with Twitter
                     </button>
                   </div>
                 </div>
@@ -171,3 +172,8 @@ export default function Dashboard() {
     return <RegistrationFlow onSuccess={handleSuccessfulRegistration} />
   }
 }
+
+// Export with dynamic import to prevent SSR issues
+export default dynamic(() => Promise.resolve(Dashboard), {
+  ssr: false
+})

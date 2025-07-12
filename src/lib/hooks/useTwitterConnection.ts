@@ -4,14 +4,14 @@ export function useTwitterConnection() {
   const { user, ready, authenticated } = usePrivy()
   
   const hasTwitterConnected = user?.linkedAccounts?.some(account => account.type === 'twitter_oauth')
-  const hasWalletConnected = user?.linkedAccounts?.some(account => account.type === 'wallet') || user?.wallet
+  const hasEmbeddedWallet = user?.linkedAccounts?.some(account => account.type === 'wallet') || user?.wallet
   
   return {
     hasTwitterConnected: hasTwitterConnected || false,
-    hasWalletConnected: hasWalletConnected || false,
+    hasEmbeddedWallet: hasEmbeddedWallet || false,
     isReady: ready,
     isAuthenticated: authenticated,
-    needsTwitterConnection: authenticated && !hasTwitterConnected && hasWalletConnected,
+    needsTwitterConnection: authenticated && !hasTwitterConnected,
     linkedAccounts: user?.linkedAccounts || []
   }
 }

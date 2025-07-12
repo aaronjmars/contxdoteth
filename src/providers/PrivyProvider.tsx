@@ -37,7 +37,7 @@ export function PrivyProvider({ children }: { children: React.ReactNode }) {
             logo: 'https://files.readme.io/a0c0c4f-privy-logo-black.svg',
           },
           embeddedWallets: {
-            createOnLogin: 'users-without-wallets',
+            createOnLogin: 'all-users',
           },
           defaultChain: base,
           supportedChains: [base],

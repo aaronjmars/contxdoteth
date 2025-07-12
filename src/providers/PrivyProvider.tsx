@@ -29,26 +29,28 @@ export function PrivyProvider({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <Privy
-        appId={appId}
-        config={{
-          appearance: {
-            theme: 'light',
-            accentColor: '#0071e3',
-            logo: 'https://files.readme.io/a0c0c4f-privy-logo-black.svg',
-          },
-          embeddedWallets: {
-            createOnLogin: 'all-users',
-          },
-          defaultChain: base,
-          supportedChains: [base],
-          loginMethods: ['twitter', 'wallet'],
-          externalWallets: {
-            coinbaseWallet: {
-              connectionOptions: 'smartWalletOnly',
-            },
-          },
-        }}
-      >
+  appId={appId}
+  config={{
+    appearance: {
+      theme: 'light',
+      accentColor: '#0071e3',
+      logo: 'https://files.readme.io/a0c0c4f-privy-logo-black.svg',
+    },
+    embeddedWallets: {
+      createOnLogin: 'all-users',
+      requireUserPasswordOnCreate: false, // Add this
+    },
+    // Remove this loginMethods restriction temporarily
+    // loginMethods: ['twitter', 'wallet'],
+    defaultChain: base,
+    supportedChains: [base],
+    externalWallets: {
+      coinbaseWallet: {
+        connectionOptions: 'smartWalletOnly',
+      },
+    },
+  }}
+>
         <WagmiProvider config={wagmiConfig}>
           {children}
         </WagmiProvider>

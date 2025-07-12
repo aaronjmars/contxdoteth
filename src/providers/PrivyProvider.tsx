@@ -18,10 +18,8 @@ const wagmiConfig = createConfig({
 const queryClient = new QueryClient()
 
 export function PrivyProvider({ children }: { children: React.ReactNode }) {
-  // Use a placeholder app ID during build time
   const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID || 'placeholder-for-build'
   
-  // Skip rendering during build if no real app ID
   if (typeof window === 'undefined' && appId === 'placeholder-for-build') {
     return <>{children}</>
   }
@@ -29,28 +27,32 @@ export function PrivyProvider({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <Privy
-  appId={appId}
-  config={{
-    appearance: {
-      theme: 'light',
-      accentColor: '#0071e3',
-      logo: 'https://files.readme.io/a0c0c4f-privy-logo-black.svg',
-    },
-    embeddedWallets: {
-      createOnLogin: 'all-users',
-      requireUserPasswordOnCreate: false, // Add this
-    },
-    // Remove this loginMethods restriction temporarily
-    // loginMethods: ['twitter', 'wallet'],
-    defaultChain: base,
-    supportedChains: [base],
-    externalWallets: {
-      coinbaseWallet: {
-        connectionOptions: 'smartWalletOnly',
-      },
-    },
-  }}
->
+        appId={appId}
+        config={{
+          appearance: {
+            theme: 'light',
+            accentColor: '#0071e3',
+            logo: 'https://files.readme.io/a0c0c4f-privy-logo-black.svg',
+            // Add this to show Coinbase in wallet list if needed
+            walletList: ['coinbase_wallet'], 
+          },
+          embeddedWallets: {
+            createOnLogin: 'all-users', // ✅ This creates embedded wallets
+          },
+          defaultChain: base,
+          supportedChains: [base],
+          
+          // Focus on social logins to get embedded wallets
+          loginMethods: ['twitter', 'email'], // ✅ Removed 'wallet' to avoid external confusion
+          
+          // Remove this entire section for now
+          // externalWallets: {
+          //   coinbaseWallet: {
+          //     connectionOptions: 'smartWalletOnly',
+          //   },
+          // },
+        }}
+      >
         <WagmiProvider config={wagmiConfig}>
           {children}
         </WagmiProvider>

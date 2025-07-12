@@ -36,6 +36,10 @@ export function PrivyProvider({ children }: { children: React.ReactNode }) {
           embeddedWallets: {
             createOnLogin: 'all-users',
           },
+          // Enable smart wallets
+          smartWallets: {
+            createOnLogin: 'all-users',
+          },
           defaultChain: base,
           supportedChains: [base],
           loginMethods: ['twitter', 'email'],

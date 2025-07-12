@@ -47,8 +47,10 @@ export function PrivyProvider({ children }: { children: React.ReactNode }) {
     // Remove loginMethods to focus on wallet connection
   }}
 >
-  {children}
-</Privy>
+        <WagmiProvider config={wagmiConfig}>
+          {children}
+        </WagmiProvider>
+      </Privy>
     </QueryClientProvider>
   )
 }

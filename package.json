@@ -34,5 +34,10 @@
     "eslint-config-next": "15.3.5",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "overrides": {
+    "permissionless": {
+      "ox": "0.8.1"
+    }
   }
 }

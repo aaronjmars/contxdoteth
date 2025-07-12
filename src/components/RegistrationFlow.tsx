@@ -154,6 +154,19 @@ export default function RegistrationFlow({ onSuccess }: RegistrationFlowProps) {
       console.log('🎮 Smart wallet client:', smartWallets?.client)
       console.log('🔧 Smart wallet client available:', !!smartWallets?.client)
       
+      // Determine which client to use for transactions
+      const activeClient = smartWallets?.client || walletClient
+      const usingSmartWallet = !!smartWallets?.client
+      
+      console.log('🎯 Active client for transactions:', activeClient)
+      console.log('🏆 Using smart wallet:', usingSmartWallet)
+      
+      if (usingSmartWallet) {
+        console.log('✨ Transactions will be sponsored by Alchemy paymaster!')
+      } else {
+        console.log('⚠️ Using regular wallet - user will pay gas fees')
+      }
+      
       // Check for smart wallet vs embedded wallet
       const smartWallet = user?.linkedAccounts?.find(account => account.type === 'smart_wallet')
       const embeddedWallet = user?.linkedAccounts?.find(account => account.type === 'wallet') || user?.wallet
@@ -240,7 +253,7 @@ export default function RegistrationFlow({ onSuccess }: RegistrationFlowProps) {
       // Step 3: Register the username via ContxRegistry
       setRegistrationState({ status: 'registering', message: 'Minting ENS name on Base...' })
       
-      if (!walletClient || !publicClient || !isConnected) {
+      if (!activeClient || !publicClient || !isConnected) {
         throw new Error('Wallet not connected')
       }
       
@@ -252,10 +265,12 @@ export default function RegistrationFlow({ onSuccess }: RegistrationFlowProps) {
         contract: CONTX_REGISTRY_ADDRESS,
         function: 'register',
         args: [username, displayName, bio],
-        from: user?.wallet?.address || 'unknown'
+        from: usingSmartWallet ? user?.smartWallet?.address : user?.wallet?.address,
+        usingSmartWallet,
+        clientType: usingSmartWallet ? 'smart_wallet' : 'embedded_wallet'
       })
       
-      const registerHash = await walletClient.writeContract({
+      const registerHash = await activeClient.writeContract({
         address: CONTX_REGISTRY_ADDRESS,
         abi: CONTX_REGISTRY_ABI,
         functionName: 'register',
@@ -264,7 +279,11 @@ export default function RegistrationFlow({ onSuccess }: RegistrationFlowProps) {
       
       console.log('✅ Registration transaction sent!')
       console.log('🔗 Transaction hash:', registerHash)
-      console.log('💡 If using smart wallet, gas should be sponsored by Alchemy paymaster')
+      if (usingSmartWallet) {
+        console.log('💸 Gas sponsored by Alchemy paymaster - user pays nothing!')
+      } else {
+        console.log('💰 User paying gas fees with embedded wallet')
+      }
       
       setRegistrationState({ status: 'registering', message: `Transaction sent, waiting for confirmation...` })
       
@@ -284,8 +303,9 @@ export default function RegistrationFlow({ onSuccess }: RegistrationFlowProps) {
       console.log('📝 About to send text records transaction...')
       console.log('🔑 Keys to set:', keys)
       console.log('📄 Number of records:', allRecords.length)
+      console.log('🎯 Using same client for text records:', usingSmartWallet ? 'smart_wallet' : 'embedded_wallet')
       
-      const textHash = await walletClient.writeContract({
+      const textHash = await activeClient.writeContract({
         address: CONTX_REGISTRY_ADDRESS,
         abi: CONTX_REGISTRY_ABI,
         functionName: 'updateFields',
@@ -294,11 +314,17 @@ export default function RegistrationFlow({ onSuccess }: RegistrationFlowProps) {
       
       console.log('✅ Text records transaction sent!')
       console.log('🔗 Transaction hash:', textHash)
+      if (usingSmartWallet) {
+        console.log('💸 Second transaction also sponsored by Alchemy!')
+      }
       
       const textReceipt = await publicClient.waitForTransactionReceipt({ hash: textHash })
       
       console.log('🎉 Text records transaction confirmed!')
       console.log('📊 Transaction receipt:', textReceipt)
+      if (usingSmartWallet) {
+        console.log('🚀 Both transactions completed with gas sponsorship!')
+      }
       
       setRegistrationState({
         status: 'success',

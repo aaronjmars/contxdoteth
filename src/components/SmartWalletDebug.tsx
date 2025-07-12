@@ -2,10 +2,12 @@
 
 import React from 'react'
 import { usePrivy } from '@privy-io/react-auth'
+import { useSmartWallets } from '@privy-io/react-auth/smart-wallets'
 import { useSmartWalletDebug } from '@/lib/hooks/useSmartWalletDebug'
 
 export default function SmartWalletDebug() {
   const { authenticated, ready } = usePrivy()
+  const smartWallets = useSmartWallets()
   const walletInfo = useSmartWalletDebug()
 
   if (!ready || !authenticated) {
@@ -85,6 +87,13 @@ export default function SmartWalletDebug() {
             </div>
           </div>
         )}
+
+        <div>
+          <strong>Transaction Method:</strong>
+          <div className={`mt-1 px-2 py-1 rounded text-xs ${smartWallets?.client ? 'bg-green-700' : 'bg-orange-700'}`}>
+            {smartWallets?.client ? '🚀 Smart Wallet (Gas Sponsored)' : '💰 Embedded Wallet (User Pays Gas)'}
+          </div>
+        </div>
 
         <div className="text-xs text-gray-400">
           Open browser console for detailed transaction logs

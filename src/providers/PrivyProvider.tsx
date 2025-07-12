@@ -1,3 +1,4 @@
+'use client'
 import { usePrivy } from '@privy-io/react-auth'
 import { useSmartWallets } from '@privy-io/react-auth/smart-wallets'
 import { base } from 'viem/chains'

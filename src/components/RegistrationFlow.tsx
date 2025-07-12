@@ -143,6 +143,42 @@ export default function RegistrationFlow({ onSuccess }: RegistrationFlowProps) {
     setRegistrationState({ status: 'registering', message: 'Preparing registration...' })
     
     try {
+      // Log wallet information for debugging smart wallet setup
+      console.log('🚀 Starting registration process...')
+      console.log('👤 User info:', user)
+      console.log('🔗 Connected wallet:', isConnected)
+      console.log('💳 Wallet client type:', walletClient)
+      
+      // Check for smart wallet vs embedded wallet
+      const smartWallet = user?.linkedAccounts?.find(account => account.type === 'smart_wallet')
+      const embeddedWallet = user?.linkedAccounts?.find(account => account.type === 'wallet') || user?.wallet
+      
+      console.log('🧠 Smart wallet found:', smartWallet)
+      console.log('💎 Embedded wallet found:', embeddedWallet)
+      
+      if (smartWallet) {
+        console.log('✅ Using Smart Wallet for transaction')
+        console.log('📍 Smart Wallet Address:', smartWallet.address)
+        console.log('⛓️ Smart Wallet Chain:', (smartWallet as unknown as { chainId?: string }).chainId || 'unknown')
+        console.log('🏗️ Smart Wallet Type:', (smartWallet as unknown as { walletClientType?: string }).walletClientType || 'unknown')
+      } else if (embeddedWallet) {
+        console.log('⚠️ Using Embedded Wallet (not smart wallet)')
+        console.log('📍 Embedded Wallet Address:', embeddedWallet.address)
+      } else {
+        console.log('❌ No wallet found!')
+      }
+      
+      // Log Alchemy configuration
+      console.log('🌍 Alchemy Smart Wallet Configuration:')
+      console.log('  Bundler URL:', process.env.NEXT_PUBLIC_ALCHEMY_BUNDLER_URL)
+      console.log('  Paymaster URL:', process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_URL)
+      console.log('  Gas Policy ID:', process.env.NEXT_PUBLIC_ALCHEMY_GAS_POLICY_ID)
+      
+      // Check if we're in a smart wallet context
+      if (!smartWallet) {
+        console.log('⚠️ WARNING: No smart wallet detected - gas will NOT be sponsored!')
+        console.log('💡 Smart wallets must be enabled in Privy Dashboard for gas sponsorship')
+      }
       // Step 1: Generate AI context from Twitter
       setRegistrationState({ status: 'registering', message: 'Analyzing Twitter profile...' })
       
@@ -206,12 +242,24 @@ export default function RegistrationFlow({ onSuccess }: RegistrationFlowProps) {
       const bio = registrationResult.ensRecords['bio'] || ''
       const displayName = registrationResult.ensRecords['name'] || username
       
+      console.log('💰 About to send registration transaction...')
+      console.log('📝 Transaction details:', {
+        contract: CONTX_REGISTRY_ADDRESS,
+        function: 'register',
+        args: [username, displayName, bio],
+        from: user?.wallet?.address || 'unknown'
+      })
+      
       const registerHash = await walletClient.writeContract({
         address: CONTX_REGISTRY_ADDRESS,
         abi: CONTX_REGISTRY_ABI,
         functionName: 'register',
         args: [username, displayName, bio]
       })
+      
+      console.log('✅ Registration transaction sent!')
+      console.log('🔗 Transaction hash:', registerHash)
+      console.log('💡 If using smart wallet, gas should be sponsored by Alchemy paymaster')
       
       setRegistrationState({ status: 'registering', message: `Transaction sent, waiting for confirmation...` })
       
@@ -228,6 +276,10 @@ export default function RegistrationFlow({ onSuccess }: RegistrationFlowProps) {
       const keys = allRecords.map(([key]) => key)
       const values = allRecords.map(([, value]) => String(value))
       
+      console.log('📝 About to send text records transaction...')
+      console.log('🔑 Keys to set:', keys)
+      console.log('📄 Number of records:', allRecords.length)
+      
       const textHash = await walletClient.writeContract({
         address: CONTX_REGISTRY_ADDRESS,
         abi: CONTX_REGISTRY_ABI,
@@ -235,7 +287,13 @@ export default function RegistrationFlow({ onSuccess }: RegistrationFlowProps) {
         args: [username, keys, values]
       })
       
-      await publicClient.waitForTransactionReceipt({ hash: textHash })
+      console.log('✅ Text records transaction sent!')
+      console.log('🔗 Transaction hash:', textHash)
+      
+      const textReceipt = await publicClient.waitForTransactionReceipt({ hash: textHash })
+      
+      console.log('🎉 Text records transaction confirmed!')
+      console.log('📊 Transaction receipt:', textReceipt)
       
       setRegistrationState({
         status: 'success',

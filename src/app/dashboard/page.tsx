@@ -9,6 +9,7 @@ import { Loader2 } from 'lucide-react'
 import TwitterConnectionScreen from '@/components/TwitterConnectionScreen'
 import RegistrationFlow from '@/components/RegistrationFlow'
 import ENSRecordsDisplay from '@/components/ENSRecordsDisplay'
+import SmartWalletDebug from '@/components/SmartWalletDebug'
 import { useTwitterConnection } from '@/lib/hooks/useTwitterConnection'
 import { DynamicGrid } from '@/components/ui/DynamicGrid'
 
@@ -166,10 +167,20 @@ function Dashboard() {
   // Conditional rendering based on whether user has a domain
   if (userDomain) {
     // User has a domain - show ENS records display
-    return <ENSRecordsDisplay userDomain={userDomain} />
+    return (
+      <>
+        <ENSRecordsDisplay userDomain={userDomain} />
+        <SmartWalletDebug />
+      </>
+    )
   } else {
     // User doesn't have a domain - show registration flow
-    return <RegistrationFlow onSuccess={handleSuccessfulRegistration} />
+    return (
+      <>
+        <RegistrationFlow onSuccess={handleSuccessfulRegistration} />
+        <SmartWalletDebug />
+      </>
+    )
   }
 }
 
